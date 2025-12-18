@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, FolderKanban } from 'lucide-react';
 
 interface Project {
@@ -11,22 +11,26 @@ interface Project {
   signalsCount: number;
 }
 
-// Mock data
-const mockProjects: Project[] = [
-  {
-    id: '1',
-    name: 'Proyecto Actual',
-    description: 'Monitoreo de tendencias en tecnología e inteligencia artificial',
-    createdAt: '2024-01-15',
-    signalsCount: 12,
-  },
-];
-
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState({ name: '', description: '' });
+
+  // Load projects from localStorage on mount
+  useEffect(() => {
+    const savedProjects = localStorage.getItem('projects');
+    if (savedProjects) {
+      setProjects(JSON.parse(savedProjects));
+    }
+  }, []);
+
+  // Save projects to localStorage whenever they change
+  useEffect(() => {
+    if (projects.length >= 0) {
+      localStorage.setItem('projects', JSON.stringify(projects));
+    }
+  }, [projects]);
 
   const handleCreateNew = () => {
     setEditingProject(null);

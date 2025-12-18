@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import { TrendingUp, Activity, Filter } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, Activity, Filter, FolderKanban, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import SignalCard, { Signal } from '@/components/SignalCard';
 import SignalDetailModal from '@/components/SignalDetailModal';
 
@@ -80,8 +81,21 @@ const mockSignals: Signal[] = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [signals, setSignals] = useState<Signal[]>(mockSignals);
+  const [hasProjects, setHasProjects] = useState(true);
+
+  // Check if projects exist on mount
+  useEffect(() => {
+    const projectsData = localStorage.getItem('projects');
+    if (projectsData) {
+      const projects = JSON.parse(projectsData);
+      setHasProjects(projects.length > 0);
+    } else {
+      setHasProjects(false);
+    }
+  }, []);
 
   // Separate signals by priority
   const acceleratingSignals = signals.filter((s) => s.status === 'Accelerating');
@@ -91,6 +105,47 @@ export default function DashboardPage() {
     setSignals((prev) => prev.filter((s) => s.id !== signalId));
     console.log(`Signal ${signalId} archived`);
   };
+
+  const handleCreateProject = () => {
+    router.push('/dashboard/projects');
+  };
+
+  // Show empty state when no projects exist
+  if (!hasProjects) {
+    return (
+      <div className="min-h-screen bg-black">
+        {/* Header */}
+        <div className="border-b border-gray-800 bg-gray-950/50 sticky top-0 z-30 backdrop-blur-sm">
+          <div className="px-8 py-6">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Tablero de Señales</h1>
+              <p className="text-gray-400">
+                Monitoreo en tiempo real de eventos y tendencias relevantes
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Empty State - No Projects */}
+        <div className="flex flex-col items-center justify-center py-32 px-8 text-center">
+          <div className="h-20 w-20 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center mb-6">
+            <FolderKanban className="h-10 w-10 text-gray-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-3">Bienvenido a Signal</h2>
+          <p className="text-gray-400 max-w-md mb-8">
+            Para comenzar a monitorear señales, primero debes crear un proyecto. Los proyectos te permiten organizar y gestionar tus señales de manera eficiente.
+          </p>
+          <button
+            onClick={handleCreateProject}
+            className="flex items-center gap-2 px-6 py-3 bg-signal-500 hover:bg-signal-600 text-white rounded-lg transition-colors font-medium text-lg"
+          >
+            <Plus className="h-6 w-6" />
+            Crear Primer Proyecto
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black">

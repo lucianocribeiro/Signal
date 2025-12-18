@@ -1,13 +1,25 @@
+'use client';
+
 import React from 'react';
 import { LayoutDashboard, Radio, FolderKanban, Settings, ChevronDown, User } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
+  const isActive = (path: string) => {
+    if (path === '/dashboard') {
+      return pathname === '/dashboard';
+    }
+    return pathname?.startsWith(path);
+  };
+
   return (
     <div className="flex h-screen bg-black text-gray-100">
       {/* Sidebar */}
@@ -37,7 +49,11 @@ export default function DashboardLayout({
         <nav className="flex-1 p-4 space-y-1">
           <Link
             href="/dashboard"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/dashboard')
+                ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+            }`}
           >
             <LayoutDashboard className="h-5 w-5" />
             <span>Tablero</span>
@@ -45,7 +61,11 @@ export default function DashboardLayout({
 
           <Link
             href="/dashboard/sources"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-900 transition-colors"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/dashboard/sources')
+                ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+            }`}
           >
             <Radio className="h-5 w-5" />
             <span>Fuentes</span>
@@ -53,7 +73,11 @@ export default function DashboardLayout({
 
           <Link
             href="/dashboard/projects"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-900 transition-colors"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/dashboard/projects')
+                ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+            }`}
           >
             <FolderKanban className="h-5 w-5" />
             <span>Proyectos</span>
@@ -61,7 +85,11 @@ export default function DashboardLayout({
 
           <Link
             href="/dashboard/settings"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-gray-200 hover:bg-gray-900 transition-colors"
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+              isActive('/dashboard/settings')
+                ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
+                : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+            }`}
           >
             <Settings className="h-5 w-5" />
             <span>Configuración</span>
