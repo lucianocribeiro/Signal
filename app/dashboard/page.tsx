@@ -140,7 +140,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 mb-4">
               <div className="h-8 w-1 bg-signal-500 rounded-full" />
               <div>
-                <h2 className="text-xl font-bold text-signal-500">Seguimiento Prioritario</h2>
+                <h2 className="text-xl font-bold text-gray-300">Seguimiento Prioritario</h2>
                 <p className="text-sm text-gray-500">
                   Señales con alto momentum que requieren atención inmediata
                 </p>

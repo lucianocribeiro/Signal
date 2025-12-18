@@ -62,8 +62,8 @@ export default function SignalCard({ signal, onClick }: SignalCardProps) {
       <h3
         className={`
           text-lg font-semibold mb-2 line-clamp-2
-          ${isAccelerating ? 'text-signal-100' : 'text-gray-200'}
-          group-hover:text-white transition-colors
+          ${isAccelerating ? 'text-gray-300 group-hover:text-signal-100' : 'text-gray-200 group-hover:text-white'}
+          transition-colors
         `}
       >
         {signal.headline}
