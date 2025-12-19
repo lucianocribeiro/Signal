@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
-import { LayoutDashboard, Radio, FolderKanban, Settings, ChevronDown, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { LayoutDashboard, Radio, FolderKanban, Settings, ChevronDown, User, LogOut, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardLayout({
   children,
@@ -12,12 +13,26 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut, profile, user, loading } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
       return pathname === '/dashboard';
     }
     return pathname?.startsWith(path);
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await signOut();
+      router.push('/login');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -97,17 +112,58 @@ export default function DashboardLayout({
         </nav>
 
         {/* Footer - User Profile + Agency Logo */}
-        <div className="p-4 border-t border-gray-800 space-y-4">
+        <div className="p-4 border-t border-gray-800 space-y-3">
           {/* User Profile */}
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-black border border-gray-800">
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-signal-500 to-signal-600 flex items-center justify-center">
-              <User className="h-4 w-4 text-white" />
+          {loading ? (
+            // Loading Skeleton
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-black border border-gray-800 animate-pulse">
+              <div className="h-8 w-8 rounded-full bg-gray-800" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="h-4 bg-gray-800 rounded w-24" />
+                <div className="h-3 bg-gray-800 rounded w-32" />
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-200 truncate">Usuario</p>
-              <p className="text-xs text-gray-500 truncate">usuario@kairos.com</p>
+          ) : (
+            <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-black border border-gray-800">
+              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-signal-500 to-signal-600 flex items-center justify-center flex-shrink-0">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-200 truncate">
+                    {profile?.full_name || 'Usuario'}
+                  </p>
+                  {profile?.role === 'owner' && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-signal-500/10 text-signal-500 border border-signal-500/20">
+                      Owner
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email || 'cargando...'}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-950/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-transparent hover:border-red-900/30"
+          >
+            {isLoggingOut ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Cerrando sesión...</span>
+              </>
+            ) : (
+              <>
+                <LogOut className="h-5 w-5" />
+                <span className="text-sm">Cerrar Sesión</span>
+              </>
+            )}
+          </button>
 
           {/* Agency Logo - 20% Larger */}
           <div className="flex justify-center pb-2">
