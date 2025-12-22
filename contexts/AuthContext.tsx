@@ -86,38 +86,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        setLoading(false);
         return { error: getSpanishErrorMessage(error) };
       }
 
       if (data.user) {
         setUser(data.user);
         setSession(data.session);
+        setLoading(false); // Stop loading immediately after auth succeeds
 
-        // Fetch user profile
-        const userProfile = await fetchUserProfile(data.user.id);
-        setProfile(userProfile);
+        // Fetch user profile in background (don't block UI)
+        fetchUserProfile(data.user.id).then(userProfile => {
+          setProfile(userProfile);
+        });
       }
 
       return { error: null };
     } catch (error) {
-      return { error: getSpanishErrorMessage(error as Error) };
-    } finally {
       setLoading(false);
+      return { error: getSpanishErrorMessage(error as Error) };
     }
   };
 
   // Sign Out
   const signOut = async (): Promise<void> => {
     try {
-      setLoading(true);
-      await supabase.auth.signOut();
+      // Use 'local' scope for faster logout (only clears local session, not server)
+      // This makes logout instant while still being safe
+      await supabase.auth.signOut({ scope: 'local' });
       setUser(null);
       setProfile(null);
       setSession(null);
     } catch (error) {
       console.error('Error signing out:', error);
-    } finally {
-      setLoading(false);
+      // Even if signOut fails, clear local state to let user navigate away
+      setUser(null);
+      setProfile(null);
+      setSession(null);
     }
   };
 
@@ -153,14 +158,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session) {
           setSession(session);
           setUser(session.user);
+          setLoading(false); // Stop loading immediately after session is retrieved
 
-          // Fetch user profile
-          const userProfile = await fetchUserProfile(session.user.id);
-          setProfile(userProfile);
+          // Fetch user profile in background
+          fetchUserProfile(session.user.id).then(userProfile => {
+            setProfile(userProfile);
+          });
+        } else {
+          setLoading(false);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
-      } finally {
         setLoading(false);
       }
     };
@@ -176,8 +184,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const userProfile = await fetchUserProfile(session.user.id);
-          setProfile(userProfile);
+          // Fetch profile in background, don't block state update
+          fetchUserProfile(session.user.id).then(userProfile => {
+            setProfile(userProfile);
+          });
         } else {
           setProfile(null);
         }

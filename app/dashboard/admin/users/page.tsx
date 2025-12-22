@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, X, User as UserIcon, Mail, Lock, Phone, Calendar, Shield, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Plus, X, User as UserIcon, Mail, Lock, Phone, Calendar, Shield, Loader2, Check, AlertCircle, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -11,7 +11,6 @@ interface UserProfile {
   full_name: string | null;
   phone: string | null;
   role: 'user' | 'owner';
-  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -71,6 +70,26 @@ export default function AdminUsersPage() {
     return emailRegex.test(email);
   };
 
+  // Validate password requirements
+  const validatePassword = (password: string): { isValid: boolean; error: string } => {
+    if (!password) {
+      return { isValid: false, error: 'La contraseña es requerida' };
+    }
+    if (password.length < 8) {
+      return { isValid: false, error: 'La contraseña debe tener al menos 8 caracteres' };
+    }
+    if (!/[a-zA-Z]/.test(password)) {
+      return { isValid: false, error: 'La contraseña debe contener al menos 1 letra' };
+    }
+    if (!/[0-9]/.test(password)) {
+      return { isValid: false, error: 'La contraseña debe contener al menos 1 número' };
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return { isValid: false, error: 'La contraseña debe contener al menos 1 símbolo (!@#$%^&*...)' };
+    }
+    return { isValid: true, error: '' };
+  };
+
   // Handle form input changes
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -98,11 +117,10 @@ export default function AdminUsersPage() {
       hasErrors = true;
     }
 
-    if (!formData.password) {
-      errors.password = 'La contraseña es requerida';
-      hasErrors = true;
-    } else if (formData.password.length < 8) {
-      errors.password = 'La contraseña debe tener al menos 8 caracteres';
+    // Validate password with new requirements
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.isValid) {
+      errors.password = passwordValidation.error;
       hasErrors = true;
     }
 
@@ -160,36 +178,34 @@ export default function AdminUsersPage() {
     }
   };
 
-  // Toggle user active status
-  const handleToggleActive = async (userId: string, currentStatus: boolean) => {
+  // Delete user
+  const handleDeleteUser = async (userId: string, userEmail: string) => {
+    // Confirm deletion
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar al usuario ${userEmail}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          is_active: !currentStatus,
-        }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Error al actualizar estado del usuario');
+        throw new Error(result.error || 'Error al eliminar usuario');
       }
 
-      // Update local state
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === userId ? { ...user, is_active: !currentStatus } : user
-        )
-      );
+      // Remove user from local state
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
 
-      setSuccess('Estado de usuario actualizado exitosamente');
+      setSuccess('Usuario eliminado exitosamente');
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al actualizar estado del usuario');
+      setError(err instanceof Error ? err.message : 'Error al eliminar usuario');
       setTimeout(() => setError(null), 3000);
     }
   };
@@ -277,7 +293,7 @@ export default function AdminUsersPage() {
                     Fecha de Creación
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                    Estado
+                    Acciones
                   </th>
                 </tr>
               </thead>
@@ -320,20 +336,12 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <button
-                        onClick={() => handleToggleActive(user.id, user.is_active)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          user.is_active ? 'bg-signal-500' : 'bg-gray-700'
-                        }`}
+                        onClick={() => handleDeleteUser(user.id, user.email)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/20 rounded-lg transition-colors text-sm border border-transparent hover:border-red-900/30"
                       >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            user.is_active ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
+                        <Trash2 className="h-4 w-4" />
+                        Eliminar
                       </button>
-                      <span className="ml-3 text-xs text-gray-400">
-                        {user.is_active ? 'Activo' : 'Inactivo'}
-                      </span>
                     </td>
                   </tr>
                 ))}
@@ -421,6 +429,28 @@ export default function AdminUsersPage() {
                   {formErrors.password && (
                     <p className="mt-1 text-xs text-red-400">{formErrors.password}</p>
                   )}
+                  {/* Password Requirements */}
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-gray-400">La contraseña debe contener:</p>
+                    <div className="space-y-0.5 text-xs">
+                      <div className={`flex items-center gap-1.5 ${formData.password.length >= 8 ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${formData.password.length >= 8 ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Mínimo 8 caracteres</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${/[a-zA-Z]/.test(formData.password) ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${/[a-zA-Z]/.test(formData.password) ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Al menos 1 letra</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${/[0-9]/.test(formData.password) ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${/[0-9]/.test(formData.password) ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Al menos 1 número</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(formData.password) ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Al menos 1 símbolo (!@#$%...)</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Full Name */}

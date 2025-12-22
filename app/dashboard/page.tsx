@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Activity, Filter, FolderKanban, Plus } from 'lucide-react';
+import { TrendingUp, Activity, Filter, FolderKanban, Plus, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import SignalCard, { Signal } from '@/components/SignalCard';
 import SignalDetailModal from '@/components/SignalDetailModal';
+import { useProjects } from '@/contexts/ProjectContext';
 
 // Mock Data for Development
 const mockSignals: Signal[] = [
@@ -82,20 +83,24 @@ const mockSignals: Signal[] = [
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { currentProject, projects, isLoading: projectsLoading } = useProjects();
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [signals, setSignals] = useState<Signal[]>(mockSignals);
-  const [hasProjects, setHasProjects] = useState(true);
 
-  // Check if projects exist on mount
+  // TODO: In the future, fetch signals filtered by currentProject.id
+  // For now, using mock data
   useEffect(() => {
-    const projectsData = localStorage.getItem('projects');
-    if (projectsData) {
-      const projects = JSON.parse(projectsData);
-      setHasProjects(projects.length > 0);
-    } else {
-      setHasProjects(false);
+    if (currentProject) {
+      // Future implementation: fetch signals for currentProject.id
+      // const fetchSignals = async () => {
+      //   const response = await fetch(`/api/signals?project_id=${currentProject.id}`);
+      //   const data = await response.json();
+      //   setSignals(data.signals);
+      // };
+      // fetchSignals();
+      console.log('Current project:', currentProject.id);
     }
-  }, []);
+  }, [currentProject]);
 
   // Separate signals by priority
   const acceleratingSignals = signals.filter((s) => s.status === 'Accelerating');
@@ -110,8 +115,20 @@ export default function DashboardPage() {
     router.push('/dashboard/projects');
   };
 
+  // Show loading state while projects are loading
+  if (projectsLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 text-signal-500 animate-spin" />
+          <p className="text-gray-400">Cargando proyectos...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show empty state when no projects exist
-  if (!hasProjects) {
+  if (projects.length === 0) {
     return (
       <div className="min-h-screen bg-black">
         {/* Header */}
@@ -147,6 +164,36 @@ export default function DashboardPage() {
     );
   }
 
+  // Show message if no current project is selected (edge case)
+  if (!currentProject) {
+    return (
+      <div className="min-h-screen bg-black">
+        {/* Header */}
+        <div className="border-b border-gray-800 bg-gray-950/50 sticky top-0 z-30 backdrop-blur-sm">
+          <div className="px-8 py-6">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">Tablero de Señales</h1>
+              <p className="text-gray-400">
+                Monitoreo en tiempo real de eventos y tendencias relevantes
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* No Project Selected State */}
+        <div className="flex flex-col items-center justify-center py-32 px-8 text-center">
+          <div className="h-20 w-20 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center mb-6">
+            <FolderKanban className="h-10 w-10 text-gray-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-3">No hay proyecto seleccionado</h2>
+          <p className="text-gray-400 max-w-md mb-8">
+            Por favor, selecciona un proyecto desde el menú lateral para ver sus señales.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black">
       {/* Header */}
@@ -154,7 +201,13 @@ export default function DashboardPage() {
         <div className="px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Tablero de Señales</h1>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-white">Tablero de Señales</h1>
+                <div className="flex items-center gap-2 px-3 py-1 bg-signal-500/10 border border-signal-500/20 rounded-lg">
+                  <FolderKanban className="h-4 w-4 text-signal-500" />
+                  <span className="text-sm font-medium text-signal-500">{currentProject.name}</span>
+                </div>
+              </div>
               <p className="text-gray-400">
                 Monitoreo en tiempo real de eventos y tendencias relevantes
               </p>

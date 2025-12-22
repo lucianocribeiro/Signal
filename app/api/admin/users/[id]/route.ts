@@ -101,20 +101,12 @@ export async function PATCH(
 
     // Parse request body
     const body = await request.json();
-    const { is_active, role, full_name, phone } = body;
+    const { role, full_name, phone_number } = body;
 
     // Validate role if provided
     if (role !== undefined && !['user', 'owner'].includes(role)) {
       return NextResponse.json(
         { error: 'El rol debe ser "user" o "owner".' },
-        { status: 400 }
-      );
-    }
-
-    // Prevent user from deactivating themselves
-    if (is_active === false && userId === user.id) {
-      return NextResponse.json(
-        { error: 'No puedes desactivar tu propia cuenta.' },
         { status: 400 }
       );
     }
@@ -142,13 +134,7 @@ export async function PATCH(
     }
 
     // Build update object with only provided fields
-    const updateData: any = {
-      updated_at: new Date().toISOString(),
-    };
-
-    if (is_active !== undefined) {
-      updateData.is_active = is_active;
-    }
+    const updateData: any = {};
 
     if (role !== undefined) {
       updateData.role = role;
@@ -158,8 +144,8 @@ export async function PATCH(
       updateData.full_name = full_name;
     }
 
-    if (phone !== undefined) {
-      updateData.phone = phone;
+    if (phone_number !== undefined) {
+      updateData.phone_number = phone_number;
     }
 
     // Update user profile
@@ -180,16 +166,13 @@ export async function PATCH(
 
     // Determine what changed for audit log
     const changes: string[] = [];
-    if (is_active !== undefined && is_active !== existingUser.is_active) {
-      changes.push(`estado: ${is_active ? 'activado' : 'desactivado'}`);
-    }
     if (role !== undefined && role !== existingUser.role) {
       changes.push(`rol: ${existingUser.role} → ${role}`);
     }
     if (full_name !== undefined && full_name !== existingUser.full_name) {
       changes.push('nombre actualizado');
     }
-    if (phone !== undefined && phone !== existingUser.phone) {
+    if (phone_number !== undefined && phone_number !== existingUser.phone_number) {
       changes.push('teléfono actualizado');
     }
 
@@ -197,11 +180,13 @@ export async function PATCH(
     await logAuditAction(user.id, 'USER_UPDATED', userId, {
       changes,
       previous: {
-        is_active: existingUser.is_active,
         role: existingUser.role,
       },
       new: updateData,
     });
+
+    // Get email from auth.users
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
 
     return NextResponse.json(
       {
@@ -209,11 +194,11 @@ export async function PATCH(
         message: 'Usuario actualizado exitosamente.',
         user: {
           id: updatedUser.id,
-          email: updatedUser.email,
+          email: authUser.user?.email,
           full_name: updatedUser.full_name,
-          phone: updatedUser.phone,
+          phone_number: updatedUser.phone_number,
           role: updatedUser.role,
-          is_active: updatedUser.is_active,
+          created_at: updatedUser.created_at,
           updated_at: updatedUser.updated_at,
         },
       },
@@ -260,7 +245,7 @@ export async function DELETE(
     // Check if target user exists
     const { data: existingUser, error: fetchError } = await supabaseAdmin
       .from('user_profiles')
-      .select('email, role')
+      .select('role')
       .eq('id', userId)
       .single();
 
@@ -270,6 +255,9 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    // Get email from auth.users for audit log
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
 
     // Delete from user_profiles (cascading should handle related records)
     const { error: deleteProfileError } = await supabaseAdmin
@@ -295,7 +283,7 @@ export async function DELETE(
 
     // Log audit action
     await logAuditAction(user.id, 'USER_DELETED', userId, {
-      email: existingUser.email,
+      email: authUser.user?.email,
       role: existingUser.role,
     });
 
