@@ -51,7 +51,7 @@ export async function DELETE(
     }
 
     // Check authorization - user must own the project
-    if (source.projects.owner_id !== user.id) {
+    if (!source.projects || source.projects.length === 0 || source.projects[0]?.owner_id !== user.id) {
       return NextResponse.json(
         { error: 'No tienes permiso para eliminar esta fuente' },
         { status: 403 }
