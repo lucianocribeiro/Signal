@@ -87,7 +87,7 @@ export async function PATCH(
     // Verify owner role
     const { authorized, response, user } = await verifyOwnerRole();
     if (!authorized || !user) {
-      return response;
+      return response!;
     }
 
     const userId = params.id;
@@ -222,7 +222,7 @@ export async function DELETE(
     // Verify owner role
     const { authorized, response, user } = await verifyOwnerRole();
     if (!authorized || !user) {
-      return response;
+      return response!;
     }
 
     const userId = params.id;
