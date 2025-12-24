@@ -327,7 +327,7 @@ export async function PATCH(request: NextRequest) {
       user: {
         ...profile,
         email: authUser.user?.email,
-        is_banned: authUser.user?.banned_until ? new Date(authUser.user.banned_until) > new Date() : false
+        is_banned: (authUser.user as any)?.banned_until ? new Date((authUser.user as any).banned_until) > new Date() : false
       }
     }, { status: 200 });
 
