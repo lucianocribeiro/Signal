@@ -1,4 +1,6 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { ScraperResult, ScraperOptions, ScrapedContent } from './types';
 import { cleanText, extractDomain } from './utils';
 import { detectPlatform, getPlatformConfig } from './platforms';
@@ -51,16 +53,32 @@ export async function scrapeUrl(
     // Validate URL
     new URL(url);
 
-    // Launch browser
-    browser = await puppeteer.launch({
-      headless: config.headless,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-      ],
-    });
+    // Detect environment: production (Vercel) or local development
+    const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
+
+    // Launch browser with appropriate configuration
+    if (isProduction) {
+      // Vercel production: use puppeteer-core with @sparticuz/chromium
+      browser = await puppeteerCore.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      });
+      console.log('[Scraper] Using @sparticuz/chromium for Vercel');
+    } else {
+      // Local development: use standard puppeteer
+      browser = await puppeteer.launch({
+        headless: config.headless,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+        ],
+      });
+      console.log('[Scraper] Using standard puppeteer for local development');
+    }
 
     // Create new page
     const page: Page = await browser.newPage();

@@ -215,3 +215,114 @@ export interface SourceRecord {
   /** Last time this source was fetched */
   last_fetch_at: string | null;
 }
+
+/**
+ * Cron Job and Refresh Types
+ * Types for scheduled scraping with user-configurable intervals
+ */
+
+/**
+ * Refresh interval options (in hours)
+ */
+export type RefreshInterval = 2 | 4 | 8 | 12;
+
+/**
+ * Refresh interval option with display metadata
+ */
+export interface RefreshIntervalOption {
+  /** Interval value in hours */
+  value: RefreshInterval;
+  /** Display label in Spanish */
+  label: string;
+  /** Description of the interval */
+  description: string;
+}
+
+/**
+ * Available refresh interval options
+ */
+export const REFRESH_INTERVAL_OPTIONS: RefreshIntervalOption[] = [
+  { value: 2, label: '2 horas', description: 'Actualizaciones frecuentes' },
+  { value: 4, label: '4 horas', description: 'Balance recomendado' },
+  { value: 8, label: '8 horas', description: 'Actualizaciones moderadas' },
+  { value: 12, label: '12 horas', description: 'Actualizaciones mínimas' },
+];
+
+/**
+ * Project refresh status information
+ */
+export interface ProjectRefreshStatus {
+  /** Project UUID */
+  projectId: string;
+  /** Project name */
+  projectName: string;
+  /** Configured refresh interval in hours */
+  refreshIntervalHours: number;
+  /** Last refresh timestamp (ISO string) */
+  lastRefreshAt: string | null;
+  /** Hours elapsed since last refresh */
+  hoursSinceRefresh: number;
+  /** Whether project is due for refresh */
+  isDue: boolean;
+}
+
+/**
+ * Scrape lock to prevent concurrent execution
+ */
+export interface ScrapeLock {
+  /** ISO timestamp when lock was acquired */
+  locked_at: string;
+  /** Execution ID (e.g., "cron-1234567890-abc") */
+  locked_by: string;
+  /** ISO timestamp when lock expires (locked_at + 10 minutes) */
+  expires_at: string;
+}
+
+/**
+ * Project settings stored in JSONB
+ */
+export interface ProjectSettings {
+  /** Refresh interval in hours (2, 4, 8, or 12) */
+  refresh_interval_hours?: RefreshInterval;
+  /** Active scrape lock (null if not locked) */
+  scrape_lock?: ScrapeLock | null;
+}
+
+/**
+ * Result of a cron job execution
+ */
+export interface CronExecutionResult {
+  /** Whether the overall execution was successful */
+  success: boolean;
+  /** Number of projects checked for refresh */
+  projectsChecked: number;
+  /** Number of projects actually refreshed */
+  projectsRefreshed: number;
+  /** Total number of sources scraped */
+  sourcesScraped: number;
+  /** Total number of duplicate items skipped */
+  duplicatesSkipped: number;
+  /** Array of error messages */
+  errors: string[];
+  /** Total execution time in milliseconds */
+  executionTimeMs: number;
+  /** ISO timestamp of execution start */
+  timestamp: string;
+  /** Detailed results per project */
+  results: Array<{
+    /** Project UUID */
+    projectId: string;
+    /** Project name */
+    projectName: string;
+    /** Number of sources scraped for this project */
+    sourcesScraped: number;
+    /** Number of successful scrapes */
+    successful: number;
+    /** Number of failed scrapes */
+    failed: number;
+    /** Number of duplicates found */
+    duplicates: number;
+    /** Error messages specific to this project */
+    errors: string[];
+  }>;
+}
