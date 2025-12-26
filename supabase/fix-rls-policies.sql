@@ -3,7 +3,7 @@
 
 -- Step 1: Drop the problematic policy
 DROP POLICY IF EXISTS "Admins can view all profiles" ON user_profiles;
-
+2
 -- Step 2: Fix the user_role enum to match application code
 -- First, we need to add the 'owner' value if it doesn't exist
 ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'owner';

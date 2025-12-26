@@ -1,0 +1,193 @@
+import puppeteer, { Browser, Page } from 'puppeteer';
+import { ScraperResult, ScraperOptions, ScrapedContent } from './types';
+import { cleanText, extractDomain } from './utils';
+import { detectPlatform, getPlatformConfig } from './platforms';
+import {
+  waitForDynamicContent,
+  scrollPage,
+  extractPlatformContent,
+  getFoundSelectors,
+} from './dynamic-handler';
+
+/**
+ * Default scraper options
+ */
+const DEFAULT_OPTIONS: Required<ScraperOptions> = {
+  timeout: 30000,
+  waitForSelector: 'body',
+  headless: true,
+  userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+};
+
+/**
+ * Scrape content from a URL using Puppeteer
+ *
+ * @param url - Target URL to scrape
+ * @param options - Optional configuration for the scraper
+ * @returns Promise resolving to ScraperResult with content or error
+ *
+ * @example
+ * const result = await scrapeUrl("https://example.com");
+ * if (result.success) {
+ *   console.log(result.content.text);
+ * } else {
+ *   console.error(result.error);
+ * }
+ */
+export async function scrapeUrl(
+  url: string,
+  options?: ScraperOptions
+): Promise<ScraperResult> {
+  const startTime = Date.now();
+  let browser: Browser | null = null;
+
+  // Merge options with defaults
+  const config: Required<ScraperOptions> = {
+    ...DEFAULT_OPTIONS,
+    ...options,
+  };
+
+  try {
+    // Validate URL
+    new URL(url);
+
+    // Launch browser
+    browser = await puppeteer.launch({
+      headless: config.headless,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+      ],
+    });
+
+    // Create new page
+    const page: Page = await browser.newPage();
+
+    // Set user agent
+    await page.setUserAgent(config.userAgent);
+
+    // Set viewport
+    await page.setViewport({
+      width: 1920,
+      height: 1080,
+    });
+
+    // Navigate to URL with timeout
+    await page.goto(url, {
+      timeout: config.timeout,
+      waitUntil: 'networkidle2', // Wait for network to be idle
+    });
+
+    // Detect platform from URL
+    const platform = detectPlatform(url);
+    const platformConfig = getPlatformConfig(platform);
+
+    console.log(`[Scraper] Detected platform: ${platform}`);
+
+    // Wait for dynamic content to load
+    const selectorsFound = await waitForDynamicContent(page, platformConfig);
+
+    // Scroll page if configured (for lazy loading)
+    let scrolled = false;
+    if (platformConfig.scrollCount > 0) {
+      await scrollPage(page, platformConfig);
+      scrolled = true;
+    }
+
+    // Extract page title
+    const title = await page.title();
+
+    // Try platform-specific extraction first
+    let text = await extractPlatformContent(page, platformConfig);
+    let extractionMethod: 'platform-specific' | 'fallback' = 'platform-specific';
+
+    // Fall back to generic extraction if platform-specific failed
+    if (!text || text.length === 0) {
+      console.warn('[Scraper] Platform-specific extraction failed, using fallback');
+      extractionMethod = 'fallback';
+
+      text = await page.evaluate(() => {
+        // Try to find article element first
+        const article = document.querySelector('article');
+        if (article) {
+          return article.innerText;
+        }
+
+        // Try to find main element
+        const main = document.querySelector('main');
+        if (main) {
+          return main.innerText;
+        }
+
+        // Fall back to body
+        const body = document.querySelector('body');
+        return body ? body.innerText : '';
+      });
+
+      text = cleanText(text);
+    }
+
+    // Calculate word count
+    const wordCount = text.split(/\s+/).filter(word => word.length > 0).length;
+
+    // Get list of selectors that were found
+    const foundSelectors = await getFoundSelectors(page, platformConfig);
+
+    // Prepare scraped content
+    const content: ScrapedContent = {
+      text,
+      title,
+      url,
+      scrapedAt: new Date(),
+      wordCount,
+    };
+
+    // Calculate duration
+    const duration = Date.now() - startTime;
+
+    // Return success result with platform metadata
+    return {
+      success: true,
+      content,
+      url,
+      timestamp: new Date(),
+      metadata: {
+        domain: extractDomain(url),
+        duration,
+        platform,
+        selectorsFound: foundSelectors,
+        scrolled,
+        extractionMethod,
+      },
+    };
+  } catch (error) {
+    // Handle errors
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+    // Log error to console with context
+    console.error('[Scraper Error]', {
+      url,
+      domain: extractDomain(url),
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+    });
+
+    return {
+      success: false,
+      url,
+      timestamp: new Date(),
+      error: errorMessage,
+      metadata: {
+        domain: extractDomain(url),
+        duration: Date.now() - startTime,
+      },
+    };
+  } finally {
+    // Always close browser
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
