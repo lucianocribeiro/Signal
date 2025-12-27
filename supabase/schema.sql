@@ -194,6 +194,7 @@ CREATE INDEX idx_sources_last_fetch_at ON sources(last_fetch_at);
 CREATE INDEX idx_raw_ingestions_source_id ON raw_ingestions(source_id);
 CREATE INDEX idx_raw_ingestions_processed ON raw_ingestions(processed);
 CREATE INDEX idx_raw_ingestions_ingested_at ON raw_ingestions(ingested_at DESC);
+CREATE INDEX idx_raw_ingestions_metadata ON raw_ingestions USING GIN(metadata);
 
 -- Signals Indexes
 CREATE INDEX idx_signals_project_id ON signals(project_id);

@@ -3,6 +3,12 @@
  * Run with: npm run cron:test
  */
 
+import { config } from 'dotenv';
+import { join } from 'path';
+
+// Load environment variables from .env.local
+config({ path: join(__dirname, '..', '.env.local') });
+
 import { getProjectsDueForRefresh, executeCronScrape } from '../lib/scraper/cron';
 
 async function testCronJob() {
