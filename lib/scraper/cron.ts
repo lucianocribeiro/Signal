@@ -131,18 +131,26 @@ export async function setProjectRefreshInterval(
   });
 
   if (error) {
-    // Fallback: use raw SQL update
+    // Fallback: fetch, update, and save settings
+    const { data, error: fetchError } = await supabase
+      .from('projects')
+      .select('settings')
+      .eq('id', projectId)
+      .single();
+
+    if (fetchError) {
+      console.error(`[Cron] Error fetching project settings for ${projectId}:`, fetchError);
+      throw fetchError;
+    }
+
+    const updatedSettings = {
+      ...(data?.settings || {}),
+      refresh_interval_hours: hours,
+    };
+
     const { error: updateError } = await supabase
       .from('projects')
-      .update({
-        settings: supabase.raw(`
-          jsonb_set(
-            COALESCE(settings, '{}'::jsonb),
-            '{refresh_interval_hours}',
-            '${hours}'
-          )
-        `),
-      })
+      .update({ settings: updatedSettings })
       .eq('id', projectId);
 
     if (updateError) {

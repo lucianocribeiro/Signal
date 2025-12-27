@@ -61,9 +61,8 @@ export async function scrapeUrl(
       // Vercel production: use puppeteer-core with @sparticuz/chromium
       browser = await puppeteerCore.launch({
         args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
         executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
+        headless: true,
       });
       console.log('[Scraper] Using @sparticuz/chromium for Vercel');
     } else {
