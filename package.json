@@ -13,6 +13,7 @@
     "cron:test": "npx tsx scripts/test-cron.ts"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@sparticuz/chromium": "^143.0.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
