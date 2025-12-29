@@ -43,12 +43,13 @@ export async function middleware(request: NextRequest) {
   const isLoginPage = pathname.startsWith('/login');
   const isDashboardRoute = pathname.startsWith('/dashboard');
   const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/dashboard/admin');
+  const isApiRoute = pathname.startsWith('/api');
   const isPublicRoute = isLoginPage || pathname.startsWith('/auth') || pathname === '/';
 
   // If user is not authenticated
   if (!user) {
-    // Allow access to public routes
-    if (isPublicRoute) {
+    // Allow access to public routes and API routes (API routes handle their own auth)
+    if (isPublicRoute || isApiRoute) {
       return supabaseResponse;
     }
 

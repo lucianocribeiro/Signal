@@ -312,3 +312,217 @@ export interface UsageLogEntry {
   /** When logged */
   created_at: string;
 }
+
+// ============================================================================
+// MOMENTUM ANALYSIS TYPES (Story 4.3)
+// ============================================================================
+
+/**
+ * Signal data formatted for momentum analysis
+ * Includes current status and momentum for comparison
+ */
+export interface SignalForMomentumAnalysis {
+  /** Signal ID */
+  id: string;
+
+  /** Signal headline */
+  headline: string;
+
+  /** Signal summary */
+  summary: string;
+
+  /** Current status */
+  status: SignalStatus;
+
+  /** Current momentum level */
+  momentum: SignalMomentum;
+
+  /** When signal was first detected */
+  detected_at: string;
+
+  /** Signal tags */
+  tags: string[];
+}
+
+/**
+ * Single momentum update from AI analysis
+ */
+export interface MomentumUpdate {
+  /** Signal ID to update */
+  signal_id: string;
+
+  /** New status after momentum analysis */
+  new_status: 'Accelerating' | 'Stabilizing';
+
+  /** New momentum level */
+  new_momentum: 'high' | 'medium' | 'low';
+
+  /** Reason for the momentum change */
+  reason: string;
+
+  /** Ingestion IDs that support this update */
+  supporting_ingestion_ids: string[];
+}
+
+/**
+ * AI response from momentum analysis
+ */
+export interface AIMomentumAnalysisResponse {
+  /** Array of signal updates with momentum changes */
+  signal_updates: MomentumUpdate[];
+
+  /** IDs of signals that remained unchanged */
+  unchanged_signals: string[];
+
+  /** Brief notes about the momentum analysis */
+  analysis_notes: string;
+}
+
+/**
+ * Updated signal record with before/after comparison
+ */
+export interface UpdatedSignal {
+  /** Signal ID */
+  id: string;
+
+  /** Signal headline */
+  headline: string;
+
+  /** Previous status */
+  old_status: SignalStatus;
+
+  /** New status */
+  new_status: SignalStatus;
+
+  /** Previous momentum */
+  old_momentum: SignalMomentum;
+
+  /** New momentum */
+  new_momentum: SignalMomentum;
+
+  /** Reason for the change */
+  reason: string;
+
+  /** When updated */
+  updated_at: string;
+}
+
+/**
+ * Result of momentum analysis operation
+ */
+export interface MomentumAnalysisResult {
+  /** Success status */
+  success: boolean;
+
+  /** Number of signals analyzed */
+  signals_analyzed: number;
+
+  /** Number of signals updated */
+  signals_updated: number;
+
+  /** Number of signals unchanged */
+  signals_unchanged: number;
+
+  /** Updated signal records */
+  updated_signals: UpdatedSignal[];
+
+  /** Token usage statistics */
+  token_usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    estimated_cost: number;
+  };
+
+  /** AI analysis notes */
+  analysis_notes: string;
+
+  /** Error message (if success is false) */
+  error?: string;
+}
+
+/**
+ * Result of full analysis pipeline (detection + momentum)
+ */
+export interface FullAnalysisResult {
+  /** Success status */
+  success: boolean;
+
+  /** Results from signal detection */
+  new_signals: {
+    /** Number of new signals created */
+    count: number;
+    /** Created signal records */
+    signals: CreatedSignal[];
+    /** Number of ingestions analyzed */
+    ingestions_analyzed: number;
+  };
+
+  /** Results from momentum analysis */
+  momentum_updates: {
+    /** Number of signals updated */
+    count: number;
+    /** Updated signal records */
+    updated_signals: UpdatedSignal[];
+    /** Number of signals unchanged */
+    unchanged_count: number;
+  };
+
+  /** Combined token usage */
+  token_usage: {
+    /** Token usage from detection */
+    detection: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      estimated_cost: number;
+    };
+    /** Token usage from momentum */
+    momentum: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      estimated_cost: number;
+    };
+    /** Total combined usage */
+    total: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+      estimated_cost: number;
+    };
+  };
+
+  /** Error message (if partial or complete failure) */
+  error?: string;
+}
+
+/**
+ * Momentum history entry stored in signal metadata
+ * Tracks the evolution of a signal's momentum over time
+ */
+export interface MomentumHistoryEntry {
+  /** When this momentum check occurred */
+  checked_at: string;
+
+  /** Status before this check */
+  previous_status: SignalStatus;
+
+  /** Status after this check */
+  new_status: SignalStatus;
+
+  /** Momentum before this check */
+  previous_momentum: SignalMomentum;
+
+  /** Momentum after this check */
+  new_momentum: SignalMomentum;
+
+  /** Reason for the change */
+  reason: string;
+
+  /** Ingestions that supported this change */
+  supporting_ingestion_ids: string[];
+
+  /** Number of pieces of evidence */
+  evidence_count: number;
+}

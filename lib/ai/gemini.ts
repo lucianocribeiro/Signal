@@ -34,9 +34,9 @@ function initializeGemini() {
 export function getGeminiModel() {
   const genAI = initializeGemini();
 
-  // Use Gemini 1.5 Flash for fast, cost-effective analysis
+  // Use Gemini 2.0 Flash Experimental (most widely available)
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash-exp',
     generationConfig: {
       temperature: 0.3, // Lower temperature for consistent, focused outputs
       topP: 0.95,
