@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, FolderKanban, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderKanban, AlertCircle, Link2 as LinkIcon } from 'lucide-react';
 
 interface Source {
   id?: string;
