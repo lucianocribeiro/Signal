@@ -138,9 +138,62 @@ export default function ProjectsPage() {
 
     try {
       if (editingProject) {
-        // TODO: Implement PATCH endpoint for editing
-        console.log('Edit project:', editingProject.id);
+        // Update existing project
+        const response = await fetch(`/api/projects/${editingProject.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            description: formData.description || null,
+            signal_instructions: formData.signal_instructions || null,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error al actualizar proyecto');
+        }
+
+        // Handle sources separately - delete removed, add new ones
+        const existingSources = editingProject.sources?.map(s => s.url) || [];
+        const newSources = sources.map(s => s.url);
+
+        // Add new sources
+        for (const source of sources) {
+          if (!existingSources.includes(source.url)) {
+            try {
+              await fetch('/api/sources', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  project_id: editingProject.id,
+                  url: source.url,
+                  name: source.name,
+                }),
+              });
+            } catch (err) {
+              console.error('Error adding source:', err);
+              // Continue with other sources even if one fails
+            }
+          }
+        }
+
         setSuccess('Proyecto actualizado exitosamente');
+
+        // Refresh projects list
+        await fetchProjects();
+
+        // Close modal after short delay
+        setTimeout(() => {
+          setIsModalOpen(false);
+          setFormData({ name: '', description: '', signal_instructions: '' });
+          setSources([]);
+        }, 1000);
       } else {
         // Create new project
         const response = await fetch('/api/projects', {
