@@ -7,6 +7,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
 
+// Force dynamic rendering for routes using cookies/auth
+export const dynamic = 'force-dynamic';
+
 /**
  * PATCH handler - Update project settings
  * Supports updating refresh_interval_hours and other project fields

@@ -7,6 +7,9 @@ import {
 } from '@/lib/analysis/fetchRawData';
 import type { AnalysisDataResponse } from '@/types/analysis';
 
+// Force dynamic rendering for routes using cookies/auth
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/analysis/raw-data
  *

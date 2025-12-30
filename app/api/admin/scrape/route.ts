@@ -8,6 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { executeCronScrape } from '@/lib/scraper/cron';
 
+// Force dynamic rendering for routes using cookies/auth
+export const dynamic = 'force-dynamic';
+
 // Verify user is owner
 async function verifyOwnerAccess(request: NextRequest) {
   const supabase = await createServerClient();

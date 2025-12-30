@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Force dynamic rendering for routes using cookies/auth
+export const dynamic = 'force-dynamic';
+
 // Helper function to detect source type from URL (matches database enum)
 function detectSourceType(url: string): 'twitter' | 'reddit' | 'news' {
   const urlLower = url.toLowerCase();

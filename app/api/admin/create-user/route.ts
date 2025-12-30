@@ -2,6 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 
+// Force dynamic rendering for routes using cookies/auth
+export const dynamic = 'force-dynamic';
+
 // Initialize Supabase Admin client with service role
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
