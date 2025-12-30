@@ -8,7 +8,7 @@
 CREATE TYPE user_role AS ENUM ('admin', 'user', 'viewer');
 CREATE TYPE signal_status AS ENUM ('Accelerating', 'Stabilizing', 'New', 'Archived');
 CREATE TYPE signal_momentum AS ENUM ('high', 'medium', 'low');
-CREATE TYPE source_type AS ENUM ('rss', 'api', 'web_scraper', 'manual');
+CREATE TYPE source_type AS ENUM ('rss', 'api', 'web_scraper', 'manual', 'twitter', 'reddit', 'news');
 CREATE TYPE scraper_status AS ENUM ('pending', 'running', 'completed', 'failed');
 CREATE TYPE report_frequency AS ENUM ('daily', 'weekly', 'monthly');
 CREATE TYPE notification_channel AS ENUM ('email', 'in_app', 'slack', 'webhook');
