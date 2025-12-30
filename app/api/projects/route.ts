@@ -26,10 +26,46 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error('[Projects API GET] Auth error:', authError);
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
+    console.log('[Projects API GET] Authenticated user:', user.id, user.email);
+
+    // Ensure user profile exists (same fix as POST)
+    const { data: existingProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    if (!existingProfile) {
+      console.log('[Projects API GET] User profile missing, creating for:', user.id);
+
+      // Create user profile if it doesn't exist
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: user.id,
+          email: user.email || '',
+          role: 'user',
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        });
+
+      if (profileError) {
+        console.error('[Projects API GET] Error creating user profile:', profileError);
+        return NextResponse.json(
+          { error: 'Error al crear perfil de usuario' },
+          { status: 500 }
+        );
+      }
+
+      console.log('[Projects API GET] User profile created successfully');
+    }
+
     // Get projects for this user
+    console.log('[Projects API GET] Fetching projects for user:', user.id);
+
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
       .select(`
@@ -54,12 +90,21 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (projectsError) {
-      console.error('Error fetching projects:', projectsError);
+      console.error('[Projects API GET] Error fetching projects:', {
+        error: projectsError,
+        code: projectsError.code,
+        message: projectsError.message,
+        details: projectsError.details,
+        hint: projectsError.hint,
+        user_id: user.id,
+      });
       return NextResponse.json(
         { error: 'Error al obtener proyectos' },
         { status: 500 }
       );
     }
+
+    console.log('[Projects API GET] Successfully fetched', projects?.length || 0, 'projects');
 
     return NextResponse.json({ projects }, { status: 200 });
 
