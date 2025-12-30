@@ -20,77 +20,44 @@ function detectSourceType(url: string): 'twitter' | 'reddit' | 'news' {
 // GET - List all projects for the authenticated user
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Projects API GET] === Request started ===');
+
     const supabase = await createClient();
+    console.log('[Projects API GET] Supabase client created');
 
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      console.error('[Projects API GET] Auth error:', authError);
+    if (authError) {
+      console.error('[Projects API GET] Auth error:', {
+        error: authError,
+        message: authError.message,
+      });
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    console.log('[Projects API GET] Authenticated user:', user.id, user.email);
-
-    // Ensure user profile exists (same fix as POST)
-    const { data: existingProfile } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-
-    if (!existingProfile) {
-      console.log('[Projects API GET] User profile missing, creating for:', user.id);
-
-      // Create user profile if it doesn't exist
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert({
-          id: user.id,
-          email: user.email || '',
-          role: 'user',
-          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-        });
-
-      if (profileError) {
-        console.error('[Projects API GET] Error creating user profile:', profileError);
-        return NextResponse.json(
-          { error: 'Error al crear perfil de usuario' },
-          { status: 500 }
-        );
-      }
-
-      console.log('[Projects API GET] User profile created successfully');
+    if (!user) {
+      console.error('[Projects API GET] No user found in session');
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    // Get projects for this user
-    console.log('[Projects API GET] Fetching projects for user:', user.id);
+    console.log('[Projects API GET] User authenticated:', {
+      id: user.id,
+      email: user.email,
+    });
+
+    // Get projects for this user (simplified query without joins)
+    console.log('[Projects API GET] Querying projects table...');
 
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
-      .select(`
-        id,
-        name,
-        description,
-        signal_instructions,
-        created_at,
-        updated_at,
-        sources (
-          id,
-          url,
-          name,
-          source_type,
-          platform,
-          is_active,
-          last_scraped_at
-        )
-      `)
+      .select('id, name, description, signal_instructions, created_at, updated_at')
       .eq('owner_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false });
 
     if (projectsError) {
-      console.error('[Projects API GET] Error fetching projects:', {
+      console.error('[Projects API GET] Projects query failed:', {
         error: projectsError,
         code: projectsError.code,
         message: projectsError.message,
@@ -99,19 +66,52 @@ export async function GET(request: NextRequest) {
         user_id: user.id,
       });
       return NextResponse.json(
-        { error: 'Error al obtener proyectos' },
+        { error: `Error al obtener proyectos: ${projectsError.message}` },
         { status: 500 }
       );
     }
 
-    console.log('[Projects API GET] Successfully fetched', projects?.length || 0, 'projects');
+    console.log('[Projects API GET] Query successful. Projects found:', projects?.length || 0);
 
-    return NextResponse.json({ projects }, { status: 200 });
+    // If projects exist, fetch sources separately to avoid join issues
+    if (projects && projects.length > 0) {
+      console.log('[Projects API GET] Fetching sources for projects...');
+
+      const projectIds = projects.map(p => p.id);
+      const { data: sources, error: sourcesError } = await supabase
+        .from('sources')
+        .select('id, project_id, url, name, source_type, platform, is_active, last_scraped_at')
+        .in('project_id', projectIds);
+
+      if (sourcesError) {
+        console.error('[Projects API GET] Sources query failed:', sourcesError);
+        // Don't fail the whole request, just return projects without sources
+      } else {
+        console.log('[Projects API GET] Sources fetched:', sources?.length || 0);
+
+        // Attach sources to their projects
+        projects.forEach(project => {
+          (project as any).sources = sources?.filter(s => s.project_id === project.id) || [];
+        });
+      }
+    }
+
+    console.log('[Projects API GET] === Request completed successfully ===');
+
+    return NextResponse.json({ projects: projects || [] }, { status: 200 });
 
   } catch (error) {
-    console.error('Unexpected error fetching projects:', error);
+    console.error('[Projects API GET] Unexpected error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      {
+        error: 'Error interno del servidor',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
