@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, FolderKanban, Link as LinkIcon, X, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderKanban, AlertCircle } from 'lucide-react';
 
 interface Source {
   id?: string;
@@ -31,9 +31,6 @@ export default function ProjectsPage() {
     description: '',
     signal_instructions: '',
   });
-  const [sources, setSources] = useState<{ url: string; name: string }[]>([]);
-  const [newSourceUrl, setNewSourceUrl] = useState('');
-  const [newSourceName, setNewSourceName] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,9 +66,6 @@ export default function ProjectsPage() {
   const handleCreateNew = () => {
     setEditingProject(null);
     setFormData({ name: '', description: '', signal_instructions: '' });
-    setSources([]);
-    setNewSourceUrl('');
-    setNewSourceName('');
     setError(null);
     setSuccess(null);
     setIsModalOpen(true);
@@ -84,9 +78,6 @@ export default function ProjectsPage() {
       description: project.description || '',
       signal_instructions: project.signal_instructions || '',
     });
-    setSources(project.sources?.map(s => ({ url: s.url, name: s.name })) || []);
-    setNewSourceUrl('');
-    setNewSourceName('');
     setError(null);
     setSuccess(null);
     setIsModalOpen(true);
@@ -99,35 +90,6 @@ export default function ProjectsPage() {
 
     // TODO: Implement DELETE endpoint
     console.log('Delete project:', projectId);
-  };
-
-  const handleAddSource = () => {
-    if (!newSourceUrl.trim()) {
-      return;
-    }
-
-    // Validate URL
-    try {
-      new URL(newSourceUrl);
-    } catch {
-      setError('URL inválida');
-      return;
-    }
-
-    setSources([
-      ...sources,
-      {
-        url: newSourceUrl.trim(),
-        name: newSourceName.trim() || new URL(newSourceUrl).hostname,
-      },
-    ]);
-    setNewSourceUrl('');
-    setNewSourceName('');
-    setError(null);
-  };
-
-  const handleRemoveSource = (index: number) => {
-    setSources(sources.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -157,49 +119,6 @@ export default function ProjectsPage() {
           throw new Error(data.error || 'Error al actualizar proyecto');
         }
 
-        // Handle sources separately - add new ones
-        const existingSources = editingProject.sources?.map(s => s.url) || [];
-
-        // Add new sources
-        const sourceErrors: string[] = [];
-        for (const source of sources) {
-          if (!existingSources.includes(source.url)) {
-            console.log('Adding new source:', source);
-            try {
-              const sourceResponse = await fetch('/api/sources', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  project_id: editingProject.id,
-                  url: source.url,
-                  name: source.name || '',
-                }),
-              });
-
-              const sourceData = await sourceResponse.json();
-
-              if (!sourceResponse.ok) {
-                const errorMsg = `Error al añadir fuente ${source.url}: ${sourceData.error || 'Error desconocido'}`;
-                console.error(errorMsg);
-                sourceErrors.push(errorMsg);
-              } else {
-                console.log('Source added successfully:', sourceData);
-              }
-            } catch (err) {
-              const errorMsg = `Error al añadir fuente ${source.url}: ${err instanceof Error ? err.message : 'Error desconocido'}`;
-              console.error(errorMsg);
-              sourceErrors.push(errorMsg);
-            }
-          }
-        }
-
-        // Show errors if any sources failed
-        if (sourceErrors.length > 0) {
-          setError(`Proyecto actualizado pero algunas fuentes fallaron:\n${sourceErrors.join('\n')}`);
-        }
-
         setSuccess('Proyecto actualizado exitosamente');
 
         // Refresh projects list
@@ -209,7 +128,6 @@ export default function ProjectsPage() {
         setTimeout(() => {
           setIsModalOpen(false);
           setFormData({ name: '', description: '', signal_instructions: '' });
-          setSources([]);
         }, 1000);
       } else {
         // Create new project
@@ -222,7 +140,6 @@ export default function ProjectsPage() {
             name: formData.name,
             description: formData.description || null,
             signal_instructions: formData.signal_instructions || null,
-            sources: sources.length > 0 ? sources : null,
           }),
         });
 
@@ -241,7 +158,6 @@ export default function ProjectsPage() {
         setTimeout(() => {
           setIsModalOpen(false);
           setFormData({ name: '', description: '', signal_instructions: '' });
-          setSources([]);
         }, 1000);
       }
     } catch (err) {
@@ -438,70 +354,8 @@ export default function ProjectsPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   {formData.signal_instructions.length}/2000 caracteres
                 </p>
-              </div>
-
-              {/* Sources */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Fuentes Iniciales
-                </label>
-
-                {/* Source List */}
-                {sources.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    {sources.map((source, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 p-3 bg-black border border-gray-800 rounded-lg"
-                      >
-                        <LinkIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{source.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{source.url}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSource(index)}
-                          className="p-1 text-gray-400 hover:text-red-400 transition-colors"
-                          disabled={submitting}
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add Source Form */}
-                <div className="space-y-2">
-                  <input
-                    type="url"
-                    value={newSourceUrl}
-                    onChange={(e) => setNewSourceUrl(e.target.value)}
-                    className="w-full px-4 py-2 bg-black border border-gray-800 rounded-lg text-white focus:outline-none focus:border-sky-500 transition-colors text-sm"
-                    placeholder="URL de la fuente (ej: https://twitter.com/...)"
-                    disabled={submitting}
-                  />
-                  <input
-                    type="text"
-                    value={newSourceName}
-                    onChange={(e) => setNewSourceName(e.target.value)}
-                    className="w-full px-4 py-2 bg-black border border-gray-800 rounded-lg text-white focus:outline-none focus:border-sky-500 transition-colors text-sm"
-                    placeholder="Nombre de la fuente (opcional)"
-                    disabled={submitting}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddSource}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
-                    disabled={submitting}
-                  >
-                    <Plus className="h-4 w-4 inline mr-1" />
-                    Agregar Fuente
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Las plataformas (Twitter/X, Reddit, News) se detectarán automáticamente desde la URL
+                <p className="text-xs text-sky-400 mt-2">
+                  💡 Tip: Agrega fuentes a este proyecto desde el menú "Fuentes"
                 </p>
               </div>
 
@@ -512,7 +366,6 @@ export default function ProjectsPage() {
                   onClick={() => {
                     setIsModalOpen(false);
                     setFormData({ name: '', description: '', signal_instructions: '' });
-                    setSources([]);
                     setError(null);
                     setSuccess(null);
                   }}
