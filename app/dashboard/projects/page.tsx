@@ -157,15 +157,16 @@ export default function ProjectsPage() {
           throw new Error(data.error || 'Error al actualizar proyecto');
         }
 
-        // Handle sources separately - delete removed, add new ones
+        // Handle sources separately - add new ones
         const existingSources = editingProject.sources?.map(s => s.url) || [];
-        const newSources = sources.map(s => s.url);
 
         // Add new sources
+        const sourceErrors: string[] = [];
         for (const source of sources) {
           if (!existingSources.includes(source.url)) {
+            console.log('Adding new source:', source);
             try {
-              await fetch('/api/sources', {
+              const sourceResponse = await fetch('/api/sources', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -173,14 +174,30 @@ export default function ProjectsPage() {
                 body: JSON.stringify({
                   project_id: editingProject.id,
                   url: source.url,
-                  name: source.name,
+                  name: source.name || '',
                 }),
               });
+
+              const sourceData = await sourceResponse.json();
+
+              if (!sourceResponse.ok) {
+                const errorMsg = `Error al añadir fuente ${source.url}: ${sourceData.error || 'Error desconocido'}`;
+                console.error(errorMsg);
+                sourceErrors.push(errorMsg);
+              } else {
+                console.log('Source added successfully:', sourceData);
+              }
             } catch (err) {
-              console.error('Error adding source:', err);
-              // Continue with other sources even if one fails
+              const errorMsg = `Error al añadir fuente ${source.url}: ${err instanceof Error ? err.message : 'Error desconocido'}`;
+              console.error(errorMsg);
+              sourceErrors.push(errorMsg);
             }
           }
+        }
+
+        // Show errors if any sources failed
+        if (sourceErrors.length > 0) {
+          setError(`Proyecto actualizado pero algunas fuentes fallaron:\n${sourceErrors.join('\n')}`);
         }
 
         setSuccess('Proyecto actualizado exitosamente');
