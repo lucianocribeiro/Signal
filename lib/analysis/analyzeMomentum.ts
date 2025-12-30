@@ -11,6 +11,7 @@ import {
 } from '../ai/prompts/momentumAnalysis';
 import { logTokenUsage } from './logUsage';
 import { getProjectAnalysisContext } from './fetchRawData';
+import { linkEvidenceToSignal } from './linkEvidence';
 import type {
   MomentumAnalysisResult,
   AIMomentumAnalysisResponse,
@@ -429,6 +430,26 @@ async function updateSignalMomentum(
   console.log(
     `[Momentum Analysis] Updated signal: ${originalSignal.headline} (${originalSignal.status}/${originalSignal.momentum} → ${update.new_status}/${update.new_momentum})`
   );
+
+  // Link momentum evidence (supporting_ingestion_ids) to the signal
+  if (update.supporting_ingestion_ids && update.supporting_ingestion_ids.length > 0) {
+    const { linked, errors } = await linkEvidenceToSignal(
+      data.id,
+      update.supporting_ingestion_ids,
+      'momentum',
+      {
+        momentum_update: update.new_status,
+        reason: update.reason,
+        updated_at: new Date().toISOString(),
+      }
+    );
+
+    console.log(`[Momentum Analysis] Linked ${linked} momentum evidence items to signal ${data.id}`);
+
+    if (errors.length > 0) {
+      console.error('[Momentum Analysis] Evidence linking errors:', errors);
+    }
+  }
 
   return {
     id: data.id,

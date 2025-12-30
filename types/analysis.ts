@@ -526,3 +526,98 @@ export interface MomentumHistoryEntry {
   /** Number of pieces of evidence */
   evidence_count: number;
 }
+
+// ============================================================================
+// EVIDENCE LINKING TYPES (Story 4.4)
+// ============================================================================
+
+/**
+ * Evidence link type - how evidence is related to a signal
+ */
+export type EvidenceLinkType = 'detected' | 'momentum' | 'manual';
+
+/**
+ * Signal evidence record from signal_evidence table
+ * Represents a link between a signal and a raw_ingestion
+ */
+export interface SignalEvidenceRecord {
+  /** Evidence link ID */
+  id: string;
+
+  /** Signal this evidence supports */
+  signal_id: string;
+
+  /** Raw ingestion ID */
+  raw_ingestion_id: string;
+
+  /** Type of evidence link */
+  reference_type: EvidenceLinkType;
+
+  /** When this evidence was linked */
+  created_at: string;
+
+  /** Additional metadata about the link */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Signal evidence with full ingestion details
+ * Used when displaying evidence for a signal
+ */
+export interface SignalEvidenceWithDetails {
+  /** Evidence link ID */
+  reference_id: string;
+
+  /** Type of evidence link */
+  reference_type: EvidenceLinkType;
+
+  /** When this evidence was linked */
+  linked_at: string;
+
+  /** Full ingestion details */
+  ingestion: {
+    /** Ingestion ID */
+    id: string;
+    /** Full content text */
+    content: string;
+    /** Original URL */
+    url: string;
+    /** When ingested */
+    ingested_at: string;
+    /** Source information */
+    source: {
+      /** Source ID */
+      id: string;
+      /** Source name */
+      name: string;
+      /** Platform type */
+      platform: string;
+    };
+  };
+}
+
+/**
+ * Simplified signal reference from evidence
+ * Used when showing which signals reference an ingestion
+ */
+export interface IngestionSignal {
+  /** Signal ID */
+  signal_id: string;
+
+  /** Signal headline */
+  headline: string;
+
+  /** Type of evidence link */
+  reference_type: EvidenceLinkType;
+}
+
+/**
+ * Result of evidence linking operation
+ */
+export interface EvidenceLinkResult {
+  /** Number of evidence items successfully linked */
+  linked: number;
+
+  /** Array of error messages if any links failed */
+  errors: string[];
+}

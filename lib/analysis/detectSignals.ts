@@ -8,6 +8,7 @@ import { getGeminiModel } from '../ai/gemini';
 import { buildSignalDetectionPrompt, prioritizeRecent } from '../ai/prompts/signalDetection';
 import { logTokenUsage } from './logUsage';
 import { fetchUnprocessedIngestions, getProjectAnalysisContext } from './fetchRawData';
+import { linkEvidenceToSignal } from './linkEvidence';
 import type {
   SignalDetectionResult,
   AISignalDetectionResponse,
@@ -232,6 +233,22 @@ async function createSignalInDatabase(
   }
 
   console.log(`[Signal Detection] Created signal: ${data.headline} (${data.id})`);
+
+  // Link evidence (raw_ingestions) to the newly created signal
+  if (detectedSignal.raw_ingestion_ids && detectedSignal.raw_ingestion_ids.length > 0) {
+    const { linked, errors } = await linkEvidenceToSignal(
+      data.id,
+      detectedSignal.raw_ingestion_ids,
+      'detected',
+      { detected_at: new Date().toISOString() }
+    );
+
+    console.log(`[Signal Detection] Linked ${linked} evidence items to signal ${data.id}`);
+
+    if (errors.length > 0) {
+      console.error('[Signal Detection] Evidence linking errors:', errors);
+    }
+  }
 
   return data as CreatedSignal;
 }
