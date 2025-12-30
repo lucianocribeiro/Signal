@@ -81,7 +81,41 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error('[Projects API] Auth error:', authError);
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
+    console.log('[Projects API] Authenticated user:', user.id, user.email);
+
+    // Ensure user profile exists (fix for foreign key constraint)
+    const { data: existingProfile } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single();
+
+    if (!existingProfile) {
+      console.log('[Projects API] User profile missing, creating for:', user.id);
+
+      // Create user profile if it doesn't exist
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .insert({
+          id: user.id,
+          email: user.email || '',
+          role: 'user',
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        });
+
+      if (profileError) {
+        console.error('[Projects API] Error creating user profile:', profileError);
+        return NextResponse.json(
+          { error: 'Error al crear perfil de usuario' },
+          { status: 500 }
+        );
+      }
+
+      console.log('[Projects API] User profile created successfully');
     }
 
     // Parse request body
@@ -151,6 +185,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 1: Create the project
+    console.log('[Projects API] Creating project with owner_id:', user.id);
+
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .insert({
@@ -164,12 +200,21 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (projectError) {
-      console.error('Error creating project:', projectError);
+      console.error('[Projects API] Error creating project:', {
+        error: projectError,
+        code: projectError.code,
+        message: projectError.message,
+        details: projectError.details,
+        hint: projectError.hint,
+        owner_id: user.id,
+      });
       return NextResponse.json(
         { error: `Error al crear proyecto: ${projectError.message}` },
         { status: 500 }
       );
     }
+
+    console.log('[Projects API] Project created successfully:', project.id);
 
     // Step 2: Create sources if provided
     let createdSources = [];
