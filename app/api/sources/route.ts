@@ -181,63 +181,125 @@ export async function POST(request: NextRequest) {
 // GET - List all sources for user's projects (optional filter by project_id)
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Sources API GET] === Request started ===');
+
     const supabase = await createClient();
+    console.log('[Sources API GET] Supabase client created');
 
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError || !user) {
+    if (authError) {
+      console.error('[Sources API GET] Auth error:', {
+        error: authError,
+        message: authError.message,
+      });
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
+
+    if (!user) {
+      console.error('[Sources API GET] No user found in session');
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
+    }
+
+    console.log('[Sources API GET] User authenticated:', {
+      id: user.id,
+      email: user.email,
+    });
 
     // Get optional project_id filter from query params
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
 
-    // Build query
-    let query = supabase
-      .from('sources')
-      .select(`
-        id,
-        project_id,
-        url,
-        name,
-        source_type,
-        platform,
-        is_active,
-        last_scraped_at,
-        created_at,
-        updated_at,
-        projects!inner (
-          id,
-          name,
-          owner_id
-        )
-      `)
-      .eq('projects.owner_id', user.id)
-      .order('created_at', { ascending: false });
+    console.log('[Sources API GET] Query params:', { projectId });
 
-    // Add project filter if provided
-    if (projectId) {
-      query = query.eq('project_id', projectId);
-    }
+    // Step 1: Get user's projects to filter sources
+    console.log('[Sources API GET] Fetching user projects...');
 
-    const { data: sources, error: sourcesError } = await query;
+    const { data: projects, error: projectsError } = await supabase
+      .from('projects')
+      .select('id, name')
+      .eq('owner_id', user.id)
+      .eq('is_active', true);
 
-    if (sourcesError) {
-      console.error('Error fetching sources:', sourcesError);
+    if (projectsError) {
+      console.error('[Sources API GET] Projects query failed:', {
+        error: projectsError,
+        code: projectsError.code,
+        message: projectsError.message,
+      });
       return NextResponse.json(
-        { error: 'Error al obtener fuentes' },
+        { error: `Error al obtener proyectos: ${projectsError.message}` },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ sources }, { status: 200 });
+    console.log('[Sources API GET] User projects found:', projects?.length || 0);
+
+    if (!projects || projects.length === 0) {
+      console.log('[Sources API GET] No projects found, returning empty sources');
+      return NextResponse.json({ sources: [] }, { status: 200 });
+    }
+
+    // Step 2: Get sources for these projects
+    const projectIds = projects.map(p => p.id);
+    console.log('[Sources API GET] Fetching sources for projects:', projectIds.length);
+
+    let sourcesQuery = supabase
+      .from('sources')
+      .select('id, project_id, url, name, source_type, platform, is_active, last_scraped_at, created_at, updated_at')
+      .in('project_id', projectIds)
+      .order('created_at', { ascending: false });
+
+    // Add project filter if provided
+    if (projectId) {
+      console.log('[Sources API GET] Filtering by project_id:', projectId);
+      sourcesQuery = sourcesQuery.eq('project_id', projectId);
+    }
+
+    const { data: sources, error: sourcesError } = await sourcesQuery;
+
+    if (sourcesError) {
+      console.error('[Sources API GET] Sources query failed:', {
+        error: sourcesError,
+        code: sourcesError.code,
+        message: sourcesError.message,
+        details: sourcesError.details,
+        hint: sourcesError.hint,
+      });
+      return NextResponse.json(
+        { error: `Error al obtener fuentes: ${sourcesError.message}` },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Sources API GET] Sources fetched:', sources?.length || 0);
+
+    // Step 3: Attach project info to each source
+    const sourcesWithProjects = sources?.map(source => {
+      const project = projects.find(p => p.id === source.project_id);
+      return {
+        ...source,
+        projects: project ? { id: project.id, name: project.name, owner_id: user.id } : null,
+      };
+    }) || [];
+
+    console.log('[Sources API GET] === Request completed successfully ===');
+
+    return NextResponse.json({ sources: sourcesWithProjects }, { status: 200 });
 
   } catch (error) {
-    console.error('Unexpected error fetching sources:', error);
+    console.error('[Sources API GET] Unexpected error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      {
+        error: 'Error interno del servidor',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }
