@@ -137,8 +137,8 @@ export default function DashboardLayout({
               {!isSidebarCollapsed && <span>Proyectos</span>}
             </Link>
 
-            {/* Admin Users Link - Only visible to owners */}
-            {profile?.role === 'owner' && (
+            {/* Admin Users Link - Only visible to admins */}
+            {profile?.role === 'admin' && (
               <Link
                 href="/dashboard/admin/users"
                 className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
@@ -195,9 +195,9 @@ export default function DashboardLayout({
                       <p className="text-sm font-medium text-gray-200 truncate">
                         {profile?.full_name || 'Usuario'}
                       </p>
-                      {profile?.role === 'owner' && (
+                      {profile?.role === 'admin' && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-signal-500/10 text-signal-500 border border-signal-500/20">
-                          Owner
+                          Admin
                         </span>
                       )}
                     </div>

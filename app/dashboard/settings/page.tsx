@@ -193,12 +193,12 @@ export default function SettingsPage() {
                 </label>
                 <div className="flex items-center gap-3">
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    profile?.role === 'owner'
+                    profile?.role === 'admin'
                       ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20'
                       : 'bg-gray-800 text-gray-400 border border-gray-700'
                   }`}>
                     <Shield className="h-3 w-3 inline mr-1" />
-                    {profile?.role === 'owner' ? 'Propietario' : 'Usuario'}
+                    {profile?.role === 'admin' ? 'Administrador' : 'Usuario'}
                   </span>
                 </div>
               </div>

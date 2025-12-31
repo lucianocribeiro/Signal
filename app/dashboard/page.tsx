@@ -1,19 +1,26 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Activity, Filter, FolderKanban, Plus, Loader2 } from 'lucide-react';
+import { TrendingUp, Activity, Filter, FolderKanban, Plus, Loader2, Zap, Download, Sparkles, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import SignalCard, { Signal } from '@/components/SignalCard';
 import SignalDetailModal from '@/components/SignalDetailModal';
 import { useProjects } from '@/contexts/ProjectContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { currentProject, projects, isLoading: projectsLoading } = useProjects();
+  const { user, profile } = useAuth();
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
   const [signals, setSignals] = useState<Signal[]>([]);
   const [isLoadingSignals, setIsLoadingSignals] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Manual trigger states
+  const [isScraperRunning, setIsScraperRunning] = useState(false);
+  const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
+  const [lastAction, setLastAction] = useState<{type: string; success: boolean; message: string} | null>(null);
 
   // Fetch signals for current project
   const fetchSignals = useCallback(async () => {
@@ -83,6 +90,88 @@ export default function DashboardPage() {
     } catch (err) {
       console.error('[Dashboard] Error archiving signal:', err);
       setError('Error al archivar la señal');
+    }
+  };
+
+  // Run scraper for current project
+  const handleRunScraper = async () => {
+    if (!currentProject) return;
+
+    setIsScraperRunning(true);
+    setLastAction(null);
+
+    try {
+      console.log('[Dashboard] Running scraper for project:', currentProject.id);
+
+      const response = await fetch(`/api/projects/${currentProject.id}/scrape`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setLastAction({
+          type: 'scraper',
+          success: true,
+          message: `Scraper completado. ${data.successful || 0} fuentes actualizadas, ${data.duplicates || 0} duplicados.`,
+        });
+      } else {
+        throw new Error(data.error || 'Error al ejecutar scraper');
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error running scraper:', error);
+      setLastAction({
+        type: 'scraper',
+        success: false,
+        message: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    } finally {
+      setIsScraperRunning(false);
+    }
+  };
+
+  // Run analysis for current project
+  const handleRunAnalysis = async () => {
+    if (!currentProject) return;
+
+    setIsAnalysisRunning(true);
+    setLastAction(null);
+
+    try {
+      console.log('[Dashboard] Running analysis for project:', currentProject.id);
+
+      const response = await fetch('/api/analysis/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: currentProject.id }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok || response.status === 207) {
+        const newSignalsCount = data.new_signals?.count || 0;
+        const updatedCount = data.momentum_updates?.count || 0;
+
+        setLastAction({
+          type: 'analysis',
+          success: true,
+          message: `Análisis completado. ${newSignalsCount} nuevas señales, ${updatedCount} actualizadas.`,
+        });
+
+        // Refresh signals after analysis
+        await fetchSignals();
+      } else {
+        throw new Error(data.error || 'Error al ejecutar análisis');
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error running analysis:', error);
+      setLastAction({
+        type: 'analysis',
+        success: false,
+        message: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    } finally {
+      setIsAnalysisRunning(false);
     }
   };
 
@@ -217,6 +306,71 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Manual Controls Panel */}
+      {currentProject && profile?.role === 'admin' && (
+        <div className="px-8 py-4">
+          <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                  <Zap className="h-4 w-4 text-purple-500" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-300">Acciones Manuales</h3>
+                  <p className="text-xs text-gray-600">Ejecutar scraper o análisis bajo demanda</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Scraper Button */}
+                <button
+                  onClick={handleRunScraper}
+                  disabled={isScraperRunning || isAnalysisRunning}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-900/50 border border-gray-700 hover:border-gray-600 disabled:border-gray-800 rounded-lg text-gray-300 disabled:text-gray-600 transition-colors text-sm"
+                >
+                  {isScraperRunning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  <span>{isScraperRunning ? 'Scraping...' : 'Ejecutar Scraper'}</span>
+                </button>
+
+                {/* Analysis Button */}
+                <button
+                  onClick={handleRunAnalysis}
+                  disabled={isScraperRunning || isAnalysisRunning}
+                  className="flex items-center gap-2 px-4 py-2 bg-signal-500 hover:bg-signal-600 disabled:bg-signal-500/50 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  {isAnalysisRunning ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  <span>{isAnalysisRunning ? 'Analizando...' : 'Ejecutar Análisis'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Action Result Message */}
+            {lastAction && (
+              <div className={`mt-3 p-3 rounded-lg text-sm flex items-center gap-2 ${
+                lastAction.success
+                  ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+                  : 'bg-red-500/10 border border-red-500/20 text-red-400'
+              }`}>
+                {lastAction.success ? (
+                  <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                )}
+                <span>{lastAction.message}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="px-8 py-6 space-y-8">

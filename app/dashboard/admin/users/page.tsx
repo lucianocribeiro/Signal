@@ -314,10 +314,10 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {user.role === 'owner' ? (
+                      {user.role === 'admin' ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-signal-500/10 text-signal-500 border border-signal-500/20">
                           <Shield className="h-3 w-3 mr-1" />
-                          Propietario
+                          Administrador
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-400 border border-gray-700">
@@ -521,14 +521,14 @@ export default function AdminUsersPage() {
                       <input
                         type="radio"
                         name="role"
-                        value="owner"
-                        checked={formData.role === 'owner'}
+                        value="admin"
+                        checked={formData.role === 'admin'}
                         onChange={(e) => handleInputChange('role', e.target.value)}
                         disabled={isCreating}
                         className="h-4 w-4 text-signal-500 focus:ring-signal-500 border-gray-600"
                       />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-white">Propietario</p>
+                        <p className="text-sm font-medium text-white">Administrador</p>
                         <p className="text-xs text-gray-500">Acceso completo y administración</p>
                       </div>
                     </label>
