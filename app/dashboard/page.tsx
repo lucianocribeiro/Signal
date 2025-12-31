@@ -1,114 +1,89 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, Activity, Filter, FolderKanban, Plus, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import SignalCard, { Signal } from '@/components/SignalCard';
 import SignalDetailModal from '@/components/SignalDetailModal';
 import { useProjects } from '@/contexts/ProjectContext';
 
-// Mock Data for Development
-const mockSignals: Signal[] = [
-  {
-    id: '1',
-    status: 'Accelerating',
-    headline: 'Nueva regulación de IA aprobada en la Unión Europea',
-    summary: 'El Parlamento Europeo aprueba la primera ley integral sobre inteligencia artificial que afectará a empresas tecnológicas globales.',
-    source: 'TechCrunch',
-    sourceUrl: 'https://techcrunch.com/ai-regulation-eu',
-    detectedAt: 'Hace 12 min',
-    momentum: 'high',
-  },
-  {
-    id: '2',
-    status: 'Accelerating',
-    headline: 'Lanzamiento de nueva plataforma de análisis predictivo para PyMEs',
-    summary: 'Una startup argentina presenta una solución de machine learning accesible para pequeñas y medianas empresas del sector financiero.',
-    source: 'Ámbito Financiero',
-    sourceUrl: 'https://ambito.com/startup-ml-pymes',
-    detectedAt: 'Hace 25 min',
-    momentum: 'high',
-  },
-  {
-    id: '3',
-    status: 'Accelerating',
-    headline: 'Microsoft integra nuevas capacidades de GPT-5 en Azure',
-    summary: 'La compañía anuncia integración profunda de modelos de lenguaje de próxima generación en su plataforma cloud empresarial.',
-    source: 'The Verge',
-    sourceUrl: 'https://theverge.com/microsoft-gpt5-azure',
-    detectedAt: 'Hace 45 min',
-    momentum: 'medium',
-  },
-  {
-    id: '4',
-    status: 'Stabilizing',
-    headline: 'Actualización de políticas de privacidad en redes sociales',
-    summary: 'Principales plataformas ajustan sus términos de servicio en respuesta a nuevas regulaciones de protección de datos.',
-    source: 'Reuters',
-    sourceUrl: 'https://reuters.com/social-privacy-updates',
-    detectedAt: 'Hace 1 hora',
-    momentum: 'low',
-  },
-  {
-    id: '5',
-    status: 'New',
-    headline: 'Inversión récord en startups de tecnología climática',
-    summary: 'Fondos de capital riesgo destinan $2.5B a empresas enfocadas en soluciones tecnológicas para el cambio climático.',
-    source: 'Bloomberg',
-    sourceUrl: 'https://bloomberg.com/climate-tech-investment',
-    detectedAt: 'Hace 2 horas',
-    momentum: 'medium',
-  },
-  {
-    id: '6',
-    status: 'Stabilizing',
-    headline: 'Adopción de blockchain en cadenas de suministro',
-    summary: 'Empresas logísticas reportan implementación gradual de tecnología blockchain para tracking de productos.',
-    source: 'Supply Chain Dive',
-    sourceUrl: 'https://supplychaindive.com/blockchain-adoption',
-    detectedAt: 'Hace 3 horas',
-    momentum: 'low',
-  },
-  {
-    id: '7',
-    status: 'Accelerating',
-    headline: 'Nuevo protocolo de ciberseguridad adoptado por bancos centrales',
-    summary: 'Instituciones financieras globales implementan estándar unificado para protección contra amenazas cibernéticas avanzadas.',
-    source: 'Financial Times',
-    sourceUrl: 'https://ft.com/cyber-banking-protocol',
-    detectedAt: 'Hace 15 min',
-    momentum: 'high',
-  },
-];
-
 export default function DashboardPage() {
   const router = useRouter();
   const { currentProject, projects, isLoading: projectsLoading } = useProjects();
   const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
-  const [signals, setSignals] = useState<Signal[]>(mockSignals);
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [isLoadingSignals, setIsLoadingSignals] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // TODO: In the future, fetch signals filtered by currentProject.id
-  // For now, using mock data
-  useEffect(() => {
-    if (currentProject) {
-      // Future implementation: fetch signals for currentProject.id
-      // const fetchSignals = async () => {
-      //   const response = await fetch(`/api/signals?project_id=${currentProject.id}`);
-      //   const data = await response.json();
-      //   setSignals(data.signals);
-      // };
-      // fetchSignals();
-      console.log('Current project:', currentProject.id);
+  // Fetch signals for current project
+  const fetchSignals = useCallback(async () => {
+    if (!currentProject) {
+      setSignals([]);
+      return;
+    }
+
+    setIsLoadingSignals(true);
+    setError(null);
+
+    try {
+      console.log('[Dashboard] Fetching signals for project:', currentProject.id);
+
+      const response = await fetch(`/api/signals?project_id=${currentProject.id}&status=active`);
+
+      if (!response.ok) {
+        throw new Error('Error al cargar señales');
+      }
+
+      const data = await response.json();
+      console.log('[Dashboard] Loaded', data.signals?.length || 0, 'signals');
+
+      setSignals(data.signals || []);
+    } catch (err) {
+      console.error('[Dashboard] Error fetching signals:', err);
+      setError('Error al cargar las señales');
+      setSignals([]);
+    } finally {
+      setIsLoadingSignals(false);
     }
   }, [currentProject]);
+
+  // Fetch signals when project changes
+  useEffect(() => {
+    fetchSignals();
+  }, [fetchSignals]);
 
   // Separate signals by priority
   const acceleratingSignals = signals.filter((s) => s.status === 'Accelerating');
   const monitoringSignals = signals.filter((s) => s.status === 'Stabilizing' || s.status === 'New');
 
-  const handleArchive = (signalId: string) => {
-    setSignals((prev) => prev.filter((s) => s.id !== signalId));
-    console.log(`Signal ${signalId} archived`);
+  // Archive signal (real database update)
+  const handleArchive = async (signalId: string) => {
+    try {
+      console.log('[Dashboard] Archiving signal:', signalId);
+
+      const response = await fetch('/api/signals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signal_id: signalId, status: 'Archived' }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al archivar señal');
+      }
+
+      console.log('[Dashboard] Signal archived successfully');
+
+      // Remove from local state immediately for responsive UI
+      setSignals((prev) => prev.filter((s) => s.id !== signalId));
+
+      // Close modal if this signal was selected
+      if (selectedSignal?.id === signalId) {
+        setSelectedSignal(null);
+      }
+    } catch (err) {
+      console.error('[Dashboard] Error archiving signal:', err);
+      setError('Error al archivar la señal');
+    }
   };
 
   const handleCreateProject = () => {
@@ -207,6 +182,9 @@ export default function DashboardPage() {
                   <FolderKanban className="h-4 w-4 text-signal-500" />
                   <span className="text-sm font-medium text-signal-500">{currentProject.name}</span>
                 </div>
+                {isLoadingSignals && (
+                  <Loader2 className="h-5 w-5 text-signal-500 animate-spin" />
+                )}
               </div>
               <p className="text-gray-400">
                 Monitoreo en tiempo real de eventos y tendencias relevantes
@@ -292,17 +270,41 @@ export default function DashboardPage() {
           </section>
         )}
 
+        {/* Error State */}
+        {error && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="h-16 w-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mb-4">
+              <Activity className="h-8 w-8 text-red-500" />
+            </div>
+            <h3 className="text-xl font-semibold text-red-400 mb-2">Error al cargar señales</h3>
+            <p className="text-gray-600 max-w-md mb-4">{error}</p>
+            <button
+              onClick={fetchSignals}
+              className="px-4 py-2 bg-signal-500 hover:bg-signal-600 text-white rounded-lg transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {signals.length === 0 && (
+        {!error && signals.length === 0 && !isLoadingSignals && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="h-16 w-16 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center mb-4">
               <Activity className="h-8 w-8 text-gray-600" />
             </div>
             <h3 className="text-xl font-semibold text-gray-400 mb-2">No hay señales activas</h3>
             <p className="text-gray-600 max-w-md">
-              Todas las señales han sido archivadas. Nuevas señales aparecerán aquí cuando sean
-              detectadas.
+              No se han detectado señales para este proyecto aún. Las señales aparecerán aquí cuando sean detectadas por el sistema de análisis.
             </p>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoadingSignals && signals.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <Loader2 className="h-10 w-10 text-signal-500 animate-spin mb-4" />
+            <p className="text-gray-400">Cargando señales...</p>
           </div>
         )}
       </div>

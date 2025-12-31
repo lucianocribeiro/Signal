@@ -1,6 +1,7 @@
 /**
  * Project Settings API
  * Handles updating individual project settings including refresh interval
+ * Epic 5 Story 5.5: Added GET and DELETE methods
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -9,6 +10,50 @@ import { createServiceClient } from '@/lib/supabase/service';
 
 // Force dynamic rendering for routes using cookies/auth
 export const dynamic = 'force-dynamic';
+
+/**
+ * GET handler - Get single project
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    console.log('[Project API GET] === Request started ===');
+
+    const supabase = await createServerClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('[Project API GET] Auth error:', authError);
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    console.log('[Project API GET] User authenticated:', user.id);
+
+    const { id: projectId } = params;
+    console.log('[Project API GET] Fetching project:', projectId);
+
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .eq('owner_id', user.id)
+      .single();
+
+    if (projectError || !project) {
+      console.error('[Project API GET] Project not found:', projectError);
+      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
+    }
+
+    console.log('[Project API GET] === Request completed successfully ===');
+
+    return NextResponse.json({ project });
+  } catch (error) {
+    console.error('[Project API GET] Unexpected error:', error);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  }
+}
 
 /**
  * PATCH handler - Update project settings
@@ -128,5 +173,64 @@ export async function PATCH(
       },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * DELETE handler - Delete project
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    console.log('[Project API DELETE] === Request started ===');
+
+    const supabase = await createServerClient();
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error('[Project API DELETE] Auth error:', authError);
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    console.log('[Project API DELETE] User authenticated:', user.id);
+
+    const { id: projectId } = params;
+    console.log('[Project API DELETE] Deleting project:', projectId);
+
+    // Verify ownership and delete
+    const { error: deleteError } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+      .eq('owner_id', user.id);
+
+    if (deleteError) {
+      console.error('[Project API DELETE] Error deleting project:', deleteError);
+      return NextResponse.json({ error: 'Error al eliminar proyecto' }, { status: 500 });
+    }
+
+    console.log('[Project API DELETE] Project deleted successfully');
+
+    // Log the action
+    const supabaseService = createServiceClient();
+    try {
+      await supabaseService.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'project_deleted',
+        resource_type: 'project',
+        resource_id: projectId,
+      });
+    } catch (auditError) {
+      console.warn('[Project API DELETE] Failed to log to audit_logs:', auditError);
+    }
+
+    console.log('[Project API DELETE] === Request completed successfully ===');
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('[Project API DELETE] Unexpected error:', error);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

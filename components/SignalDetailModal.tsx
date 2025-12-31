@@ -1,8 +1,25 @@
 'use client';
 
-import React from 'react';
-import { X, Archive, ExternalLink, TrendingUp, Minus, Clock, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Archive, ExternalLink, TrendingUp, Minus, Clock, AlertCircle, Loader2, FileText } from 'lucide-react';
 import { Signal } from './SignalCard';
+
+interface EvidenceItem {
+  reference_id: string;
+  reference_type: 'detected' | 'momentum' | 'manual';
+  linked_at: string;
+  ingestion: {
+    id: string;
+    content: string;
+    url: string;
+    ingested_at: string;
+    source: {
+      id: string;
+      name: string;
+      platform: string;
+    };
+  };
+}
 
 interface SignalDetailModalProps {
   signal: Signal | null;
@@ -11,12 +28,68 @@ interface SignalDetailModalProps {
   onArchive: (signalId: string) => void;
 }
 
+// Helper function to format relative time in Spanish
+function formatRelativeTime(isoString: string): string {
+  const now = new Date();
+  const then = new Date(isoString);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Ahora';
+  if (diffMins < 60) return `Hace ${diffMins} min`;
+  if (diffHours < 24) return `Hace ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
+  if (diffDays < 7) return `Hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+  return then.toLocaleDateString('es-ES');
+}
+
 export default function SignalDetailModal({
   signal,
   isOpen,
   onClose,
   onArchive,
 }: SignalDetailModalProps) {
+  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
+  const [isLoadingEvidence, setIsLoadingEvidence] = useState(false);
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
+
+  // Fetch evidence when modal opens with a signal
+  useEffect(() => {
+    if (!signal?.id) {
+      setEvidence([]);
+      return;
+    }
+
+    const fetchEvidence = async () => {
+      setIsLoadingEvidence(true);
+      setEvidenceError(null);
+
+      try {
+        console.log('[SignalDetailModal] Fetching evidence for signal:', signal.id);
+
+        const response = await fetch(`/api/signals/${signal.id}/evidence`);
+
+        if (!response.ok) {
+          throw new Error('Error al cargar evidencia');
+        }
+
+        const data = await response.json();
+        console.log('[SignalDetailModal] Loaded', data.evidence?.length || 0, 'evidence items');
+
+        setEvidence(data.evidence || []);
+      } catch (err) {
+        console.error('[SignalDetailModal] Error fetching evidence:', err);
+        setEvidenceError('Error al cargar la evidencia');
+        setEvidence([]);
+      } finally {
+        setIsLoadingEvidence(false);
+      }
+    };
+
+    fetchEvidence();
+  }, [signal?.id]);
+
   if (!isOpen || !signal) return null;
 
   const isAccelerating = signal.status === 'Accelerating';
@@ -70,7 +143,7 @@ export default function SignalDetailModal({
               {/* Timestamp */}
               <div className="flex items-center gap-1.5 text-sm text-gray-500">
                 <Clock className="h-4 w-4" />
-                <span>{signal.detectedAt}</span>
+                <span>{formatRelativeTime(signal.detected_at)}</span>
               </div>
             </div>
 
@@ -116,7 +189,7 @@ export default function SignalDetailModal({
                     <div className="border-t border-gray-800 pt-3">
                       <h4 className="text-sm font-semibold text-signal-500 mb-1">DÓNDE</h4>
                       <p className="text-sm text-gray-300 leading-relaxed">
-                        Detectado en {signal.source}
+                        Detectado en {signal.source_name || 'múltiples fuentes'}
                       </p>
                     </div>
 
@@ -133,17 +206,83 @@ export default function SignalDetailModal({
 
               {/* Evidence/Source */}
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Evidencia</h3>
-                <a
-                  href={signal.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-3 bg-black border border-gray-800 rounded-lg text-signal-500 hover:border-signal-500/50 hover:bg-signal-500/5 transition-colors group"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  <span className="flex-1 text-sm font-medium truncate">{signal.sourceUrl}</span>
-                  <span className="text-xs text-gray-500 group-hover:text-signal-400">Abrir fuente</span>
-                </a>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+                    Evidencia ({evidence.length})
+                  </h3>
+                  {isLoadingEvidence && (
+                    <Loader2 className="h-4 w-4 text-signal-500 animate-spin" />
+                  )}
+                </div>
+
+                {/* Loading State */}
+                {isLoadingEvidence && evidence.length === 0 && (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="flex flex-col items-center gap-2">
+                      <Loader2 className="h-8 w-8 text-signal-500 animate-spin" />
+                      <p className="text-sm text-gray-500">Cargando evidencia...</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {evidenceError && !isLoadingEvidence && (
+                  <div className="flex items-center justify-center py-8 bg-red-500/5 border border-red-500/20 rounded-lg">
+                    <p className="text-sm text-red-400">{evidenceError}</p>
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {!isLoadingEvidence && !evidenceError && evidence.length === 0 && (
+                  <div className="flex items-center justify-center py-8 bg-gray-900/50 border border-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-500">No hay evidencia disponible</p>
+                  </div>
+                )}
+
+                {/* Evidence Items */}
+                {!isLoadingEvidence && !evidenceError && evidence.length > 0 && (
+                  <div className="space-y-3">
+                    {evidence.map((item) => (
+                      <div
+                        key={item.reference_id}
+                        className="bg-black border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors"
+                      >
+                        {/* Source Info */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="h-4 w-4 text-signal-500" />
+                          <span className="text-sm font-medium text-gray-300">
+                            {item.ingestion.source.name}
+                          </span>
+                          <span className="text-xs text-gray-600">•</span>
+                          <span className="text-xs text-gray-500 capitalize">
+                            {item.ingestion.source.platform}
+                          </span>
+                          <span className="text-xs text-gray-600">•</span>
+                          <span className="text-xs text-gray-500">
+                            {formatRelativeTime(item.ingestion.ingested_at)}
+                          </span>
+                        </div>
+
+                        {/* Content Preview */}
+                        <p className="text-sm text-gray-400 leading-relaxed mb-3 line-clamp-3">
+                          {item.ingestion.content.substring(0, 200)}
+                          {item.ingestion.content.length > 200 ? '...' : ''}
+                        </p>
+
+                        {/* Link */}
+                        <a
+                          href={item.ingestion.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-signal-500 hover:text-signal-400 transition-colors group"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="group-hover:underline">Ver fuente original</span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -1,17 +1,37 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp, Minus, Clock, ExternalLink } from 'lucide-react';
+import { TrendingUp, Minus, Clock, ExternalLink, FileText } from 'lucide-react';
 
 export interface Signal {
   id: string;
-  status: 'Accelerating' | 'Stabilizing' | 'New';
+  project_id: string;
+  status: 'Accelerating' | 'Stabilizing' | 'New' | 'Archived';
   headline: string;
   summary: string;
-  source: string;
-  sourceUrl: string;
-  detectedAt: string;
+  source_name: string | null;
+  source_url: string | null;
+  detected_at: string; // ISO timestamp
   momentum: 'high' | 'medium' | 'low';
+  tags: string[];
+  evidence_count?: number;
+  created_at?: string;
+}
+
+// Helper function to format relative time in Spanish
+function formatRelativeTime(isoString: string): string {
+  const now = new Date();
+  const then = new Date(isoString);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Ahora';
+  if (diffMins < 60) return `Hace ${diffMins} min`;
+  if (diffHours < 24) return `Hace ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
+  if (diffDays < 7) return `Hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+  return then.toLocaleDateString('es-ES');
 }
 
 interface SignalCardProps {
@@ -54,7 +74,7 @@ export default function SignalCard({ signal, onClick }: SignalCardProps) {
 
         <div className="flex items-center gap-1.5 text-xs text-gray-500">
           <Clock className="h-3.5 w-3.5" />
-          <span>{signal.detectedAt}</span>
+          <span>{formatRelativeTime(signal.detected_at)}</span>
         </div>
       </div>
 
@@ -74,11 +94,21 @@ export default function SignalCard({ signal, onClick }: SignalCardProps) {
         {signal.summary}
       </p>
 
-      {/* Source */}
+      {/* Source and Evidence */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-800">
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <ExternalLink className="h-3.5 w-3.5" />
-          <span className="truncate max-w-[200px]">{signal.source}</span>
+        <div className="flex items-center gap-3">
+          {signal.source_name && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span className="truncate max-w-[150px]">{signal.source_name}</span>
+            </div>
+          )}
+          {signal.evidence_count !== undefined && signal.evidence_count > 0 && (
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <FileText className="h-3.5 w-3.5" />
+              <span>{signal.evidence_count} fuente{signal.evidence_count !== 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
 
         {/* Momentum Indicator */}
