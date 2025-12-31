@@ -17,8 +17,8 @@ const supabaseAdmin = createClient(
   }
 );
 
-// Verify user is owner
-async function verifyOwnerAccess(request: NextRequest) {
+// Verify user is admin
+async function verifyAdminAccess(request: NextRequest) {
   const supabase = await createServerClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -33,7 +33,7 @@ async function verifyOwnerAccess(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (profileError || profile?.role !== 'owner') {
+  if (profileError || profile?.role !== 'admin') {
     return { authorized: false, error: 'Acceso denegado' };
   }
 
@@ -43,8 +43,8 @@ async function verifyOwnerAccess(request: NextRequest) {
 // POST - Create new user
 export async function POST(request: NextRequest) {
   try {
-    // Verify owner access
-    const { authorized, error: authError, userId } = await verifyOwnerAccess(request);
+    // Verify admin access
+    const { authorized, error: authError, userId } = await verifyAdminAccess(request);
     if (!authorized) {
       return NextResponse.json({ error: authError }, { status: 403 });
     }
@@ -61,9 +61,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    if (role !== 'user' && role !== 'owner') {
+    if (role !== 'user' && role !== 'admin' && role !== 'viewer') {
       return NextResponse.json(
-        { error: 'Rol inválido. Debe ser "user" o "owner"' },
+        { error: 'Rol inválido. Debe ser "user", "admin" o "viewer"' },
         { status: 400 }
       );
     }
@@ -165,8 +165,8 @@ export async function POST(request: NextRequest) {
 // GET - List all users
 export async function GET(request: NextRequest) {
   try {
-    // Verify owner access
-    const { authorized, error: authError } = await verifyOwnerAccess(request);
+    // Verify admin access
+    const { authorized, error: authError } = await verifyAdminAccess(request);
     if (!authorized) {
       return NextResponse.json({ error: authError }, { status: 403 });
     }
@@ -219,8 +219,8 @@ export async function GET(request: NextRequest) {
 // PATCH - Update user (activate/deactivate, change role)
 export async function PATCH(request: NextRequest) {
   try {
-    // Verify owner access
-    const { authorized, error: authError, userId } = await verifyOwnerAccess(request);
+    // Verify admin access
+    const { authorized, error: authError, userId } = await verifyAdminAccess(request);
     if (!authorized) {
       return NextResponse.json({ error: authError }, { status: 403 });
     }
@@ -239,7 +239,7 @@ export async function PATCH(request: NextRequest) {
     const profileUpdates: any = {};
 
     if (updates.role !== undefined) {
-      if (updates.role !== 'user' && updates.role !== 'owner') {
+      if (updates.role !== 'user' && updates.role !== 'admin' && updates.role !== 'viewer') {
         return NextResponse.json(
           { error: 'Rol inválido' },
           { status: 400 }

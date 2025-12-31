@@ -61,7 +61,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // User is authenticated - fetch user profile to check role
-  let userRole: 'user' | 'owner' | null = null;
+  let userRole: 'admin' | 'user' | 'viewer' | null = null;
 
   try {
     const { data: profile, error } = await supabase
@@ -107,8 +107,8 @@ export async function middleware(request: NextRequest) {
 
   // Check admin route access
   if (isAdminRoute) {
-    // Only owners can access admin routes
-    if (userRole !== 'owner') {
+    // Only admins can access admin routes
+    if (userRole !== 'admin') {
       const dashboardUrl = request.nextUrl.clone();
       dashboardUrl.pathname = '/dashboard';
       dashboardUrl.searchParams.set('error', 'unauthorized');

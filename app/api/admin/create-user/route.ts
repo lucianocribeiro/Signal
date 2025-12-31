@@ -19,7 +19,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify the requesting user is an owner
+    // Verify the requesting user is an admin
     const supabase = await createServerClient();
     const {
       data: { user },
@@ -29,14 +29,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // Check if user is owner
+    // Check if user is admin
     const { data: profile } = await supabase
       .from('user_profiles')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'owner') {
+    if (profile?.role !== 'admin') {
       return NextResponse.json(
         { error: 'No tienes permisos para crear usuarios' },
         { status: 403 }

@@ -17,8 +17,8 @@ const supabaseAdmin = createClient(
   }
 );
 
-// Helper function to verify owner role
-async function verifyOwnerRole() {
+// Helper function to verify admin role
+async function verifyAdminRole() {
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -35,18 +35,18 @@ async function verifyOwnerRole() {
     };
   }
 
-  // Check if user is owner
+  // Check if user is admin
   const { data: profile, error } = await supabase
     .from('user_profiles')
     .select('role')
     .eq('id', user.id)
     .single();
 
-  if (error || profile?.role !== 'owner') {
+  if (error || profile?.role !== 'admin') {
     return {
       authorized: false,
       response: NextResponse.json(
-        { error: 'Acceso denegado. Solo los propietarios pueden realizar esta acción.' },
+        { error: 'Acceso denegado. Solo los administradores pueden realizar esta acción.' },
         { status: 403 }
       ),
       user: null,
@@ -87,8 +87,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verify owner role
-    const { authorized, response, user } = await verifyOwnerRole();
+    // Verify admin role
+    const { authorized, response, user } = await verifyAdminRole();
     if (!authorized || !user) {
       return response!;
     }
@@ -107,17 +107,17 @@ export async function PATCH(
     const { role, full_name, phone_number } = body;
 
     // Validate role if provided
-    if (role !== undefined && !['user', 'owner'].includes(role)) {
+    if (role !== undefined && !['user', 'admin', 'viewer'].includes(role)) {
       return NextResponse.json(
-        { error: 'El rol debe ser "user" o "owner".' },
+        { error: 'El rol debe ser "user", "admin" o "viewer".' },
         { status: 400 }
       );
     }
 
-    // Prevent user from demoting themselves from owner
-    if (role === 'user' && userId === user.id) {
+    // Prevent user from demoting themselves from admin
+    if (role !== 'admin' && userId === user.id) {
       return NextResponse.json(
-        { error: 'No puedes cambiar tu propio rol de propietario.' },
+        { error: 'No puedes cambiar tu propio rol de administrador.' },
         { status: 400 }
       );
     }
@@ -222,8 +222,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verify owner role
-    const { authorized, response, user } = await verifyOwnerRole();
+    // Verify admin role
+    const { authorized, response, user } = await verifyAdminRole();
     if (!authorized || !user) {
       return response!;
     }

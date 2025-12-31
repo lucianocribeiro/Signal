@@ -11,8 +11,8 @@ import { executeCronScrape } from '@/lib/scraper/cron';
 // Force dynamic rendering for routes using cookies/auth
 export const dynamic = 'force-dynamic';
 
-// Verify user is owner
-async function verifyOwnerAccess(request: NextRequest) {
+// Verify user is admin
+async function verifyAdminAccess(request: NextRequest) {
   const supabase = await createServerClient();
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -27,7 +27,7 @@ async function verifyOwnerAccess(request: NextRequest) {
     .eq('id', user.id)
     .single();
 
-  if (profileError || profile?.role !== 'owner') {
+  if (profileError || profile?.role !== 'admin') {
     return { authorized: false, error: 'Acceso denegado' };
   }
 
@@ -36,14 +36,14 @@ async function verifyOwnerAccess(request: NextRequest) {
 
 /**
  * POST handler - Manually trigger cron scrape
- * Requires owner role
+ * Requires admin role
  */
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
   try {
-    // Verify owner access
-    const { authorized, error: authError } = await verifyOwnerAccess(request);
+    // Verify admin access
+    const { authorized, error: authError } = await verifyAdminAccess(request);
     if (!authorized) {
       return NextResponse.json({ error: authError }, { status: 403 });
     }

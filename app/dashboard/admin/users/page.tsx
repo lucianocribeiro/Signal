@@ -10,7 +10,7 @@ interface UserProfile {
   email: string;
   full_name: string | null;
   phone: string | null;
-  role: 'user' | 'owner';
+  role: 'admin' | 'user' | 'viewer';
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +32,7 @@ export default function AdminUsersPage() {
     password: '',
     full_name: '',
     phone: '',
-    role: 'user' as 'user' | 'owner',
+    role: 'user' as 'admin' | 'user' | 'viewer',
   });
 
   const [formErrors, setFormErrors] = useState({
