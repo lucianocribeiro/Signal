@@ -65,14 +65,10 @@ export async function scrapeUrl(
       console.log('[Scraper] Chromium executable path:', execPath);
 
       browser = await puppeteerCore.launch({
-        args: [
-          ...chromium.args,
-          '--disable-gpu',
-          '--single-process',
-        ],
-        defaultViewport: { width: 1920, height: 1080 },
+        args: chromium.args,
         executablePath: execPath,
-        headless: true,
+        headless: chromium.headless,
+        defaultViewport: { width: 1920, height: 1080 },
       });
       console.log('[Scraper] Browser launched successfully with @sparticuz/chromium');
     } else {
