@@ -60,17 +60,30 @@ export async function scrapeUrl(
     if (isProduction) {
       // Vercel production: use puppeteer-core with @sparticuz/chromium
 
-      // Get executable path and log for debugging
+      // Force-disable graphics mode to reduce footprint
+      try {
+        (chromium as any).setGraphicsMode = false;
+      } catch (e) {
+        console.log('[Scraper] setGraphicsMode not available in this version');
+      }
+
       const execPath = await chromium.executablePath();
       console.log('[Scraper] Chromium executable path:', execPath);
 
       browser = await puppeteerCore.launch({
-        args: chromium.args,
-        executablePath: execPath,
-        headless: chromium.headless,
+        args: [
+          ...chromium.args,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--single-process',
+        ],
         defaultViewport: { width: 1920, height: 1080 },
-      });
-      console.log('[Scraper] Browser launched successfully with @sparticuz/chromium');
+        executablePath: execPath,
+        headless: true,
+      }) as any;
+      console.log('[Scraper] Browser launched successfully in production');
     } else {
       // Local development: use standard puppeteer
       browser = await puppeteer.launch({

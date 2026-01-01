@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "node node_modules/@sparticuz/chromium/bin/install.js || true",
     "scraper:test": "npx tsx scripts/test-scraper.ts",
     "scraper:test:db": "npx tsx scripts/test-scrape-and-save.ts",
     "scraper:cleanup": "npx tsx scripts/run-cleanup.ts",
