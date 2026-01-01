@@ -70,7 +70,7 @@ export async function scrapeUrl(
           '--disable-gpu',
           '--single-process',
         ],
-        defaultViewport: chromium.defaultViewport,
+        defaultViewport: { width: 1920, height: 1080 },
         executablePath: execPath,
         headless: true,
       });
