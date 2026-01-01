@@ -60,14 +60,9 @@ export async function scrapeUrl(
     if (isProduction) {
       // Vercel production: use puppeteer-core with @sparticuz/chromium
 
-      // Configure chromium before launch
-      chromium.setHeadlessMode = true;
-      chromium.setGraphicsMode = false;
-
       // Get executable path and log for debugging
       const execPath = await chromium.executablePath();
       console.log('[Scraper] Chromium executable path:', execPath);
-      console.log('[Scraper] Chromium version:', chromium.version || 'unknown');
 
       browser = await puppeteerCore.launch({
         args: [
@@ -77,7 +72,7 @@ export async function scrapeUrl(
         ],
         defaultViewport: chromium.defaultViewport,
         executablePath: execPath,
-        headless: chromium.headless,
+        headless: true,
       });
       console.log('[Scraper] Browser launched successfully with @sparticuz/chromium');
     } else {
