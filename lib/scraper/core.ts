@@ -1,4 +1,4 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import puppeteer, { Page } from 'puppeteer';
 import puppeteerCore from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { ScraperResult, ScraperOptions, ScrapedContent } from './types';
@@ -41,7 +41,7 @@ export async function scrapeUrl(
   options?: ScraperOptions
 ): Promise<ScraperResult> {
   const startTime = Date.now();
-  let browser: Browser | null = null;
+  let browser: any = null;
 
   // Merge options with defaults
   const config: Required<ScraperOptions> = {
