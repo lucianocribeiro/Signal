@@ -10,6 +10,7 @@ import {
   extractPlatformContent,
   getFoundSelectors,
 } from './dynamic-handler';
+import { scrapeRedditJson, scrapeWithReadability } from './fast-path';
 
 /**
  * Default scraper options
@@ -42,6 +43,8 @@ export async function scrapeUrl(
 ): Promise<ScraperResult> {
   const startTime = Date.now();
   let browser: any = null;
+  let fastPathAttempted = false;
+  let scrapingMethod = 'puppeteer';
 
   // Merge options with defaults
   const config: Required<ScraperOptions> = {
@@ -53,14 +56,86 @@ export async function scrapeUrl(
     // Validate URL
     new URL(url);
 
+    // Detect platform from URL
+    const platform = detectPlatform(url);
+    console.log(`[Scraper] Detected platform: ${platform} for URL: ${url}`);
+
+    // ===== PHASE 1: Try Fast Path First (except for Twitter) =====
+    if (platform === 'reddit') {
+      console.log(`[Scraper] Attempting Reddit JSON fast path for: ${url}`);
+      const fastResult = await scrapeRedditJson(url);
+      fastPathAttempted = true;
+
+      if (fastResult.success && fastResult.content.length > 0) {
+        scrapingMethod = fastResult.method;
+        const wordCount = fastResult.content.split(/\s+/).filter(word => word.length > 0).length;
+
+        console.log(`[Scraper] ✅ Fast path succeeded in ${Date.now() - startTime}ms`);
+
+        return {
+          success: true,
+          content: {
+            text: fastResult.content,
+            title: 'Reddit Content', // Reddit JSON doesn't have a single title for listings
+            url,
+            scrapedAt: new Date(),
+            wordCount,
+          },
+          url,
+          timestamp: new Date(),
+          metadata: {
+            domain: extractDomain(url),
+            duration: Date.now() - startTime,
+            platform,
+            extractionMethod: 'fast-path',
+          },
+        };
+      } else {
+        console.log(`[Scraper] ⚠️ Fast path failed: ${fastResult.error}, falling back to Puppeteer`);
+      }
+    } else if (platform === 'news' || platform === 'generic') {
+      console.log(`[Scraper] Attempting Readability fast path for: ${url}`);
+      const fastResult = await scrapeWithReadability(url);
+      fastPathAttempted = true;
+
+      if (fastResult.success && fastResult.content.length > 0) {
+        scrapingMethod = fastResult.method;
+        const wordCount = fastResult.content.split(/\s+/).filter(word => word.length > 0).length;
+
+        console.log(`[Scraper] ✅ Fast path succeeded in ${Date.now() - startTime}ms`);
+
+        return {
+          success: true,
+          content: {
+            text: fastResult.content,
+            title: 'Article Content',
+            url,
+            scrapedAt: new Date(),
+            wordCount,
+          },
+          url,
+          timestamp: new Date(),
+          metadata: {
+            domain: extractDomain(url),
+            duration: Date.now() - startTime,
+            platform,
+            extractionMethod: 'fast-path',
+          },
+        };
+      } else {
+        console.log(`[Scraper] ⚠️ Fast path failed: ${fastResult.error}, falling back to Puppeteer`);
+      }
+    }
+
+    // ===== PHASE 2: Puppeteer Fallback =====
+    console.log(`[Scraper] Using Puppeteer for: ${url}`);
+
     // Detect environment: production (Vercel) or local development
     const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
 
     // Launch browser with appropriate configuration
     if (isProduction) {
       // Vercel production: use puppeteer-core with @sparticuz/chromium-min
-
-      // Use remote binary URL for chromium-min
       const execPath = await chromium.executablePath(
         'https://github.com/nickreese/nickreese/releases/download/chromium-v119.0.2-pack/chromium-v119.0.2-pack.tar'
       );
@@ -91,6 +166,9 @@ export async function scrapeUrl(
     // Create new page
     const page: Page = await browser.newPage();
 
+    // Set default navigation timeout to prevent infinite hangs
+    page.setDefaultNavigationTimeout(60000);
+
     // Set user agent
     await page.setUserAgent(config.userAgent);
 
@@ -100,17 +178,13 @@ export async function scrapeUrl(
       height: 1080,
     });
 
-    // Navigate to URL with timeout
+    // Navigate to URL with faster wait strategy
     await page.goto(url, {
-      timeout: config.timeout,
-      waitUntil: 'networkidle2', // Wait for network to be idle
+      timeout: 60000,
+      waitUntil: 'domcontentloaded', // Faster than networkidle2
     });
 
-    // Detect platform from URL
-    const platform = detectPlatform(url);
     const platformConfig = getPlatformConfig(platform);
-
-    console.log(`[Scraper] Detected platform: ${platform}`);
 
     // Wait for dynamic content to load
     const selectorsFound = await waitForDynamicContent(page, platformConfig);
@@ -173,6 +247,8 @@ export async function scrapeUrl(
     // Calculate duration
     const duration = Date.now() - startTime;
 
+    console.log(`[Scraper] ✅ Puppeteer succeeded in ${duration}ms`);
+
     // Return success result with platform metadata
     return {
       success: true,
@@ -198,6 +274,8 @@ export async function scrapeUrl(
       domain: extractDomain(url),
       error: errorMessage,
       timestamp: new Date().toISOString(),
+      fastPathAttempted,
+      scrapingMethod,
     });
 
     return {
