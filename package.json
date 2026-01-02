@@ -7,7 +7,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "node node_modules/@sparticuz/chromium/bin/install.js || true",
     "scraper:test": "npx tsx scripts/test-scraper.ts",
     "scraper:test:db": "npx tsx scripts/test-scrape-and-save.ts",
     "scraper:cleanup": "npx tsx scripts/run-cleanup.ts",
@@ -15,7 +14,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@sparticuz/chromium": "^119.0.2",
+    "@sparticuz/chromium-min": "^119.0.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "lucide-react": "^0.344.0",

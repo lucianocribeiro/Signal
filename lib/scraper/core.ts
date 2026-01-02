@@ -1,6 +1,6 @@
 import puppeteer, { Page } from 'puppeteer';
 import puppeteerCore from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import chromium from '@sparticuz/chromium-min';
 import { ScraperResult, ScraperOptions, ScrapedContent } from './types';
 import { cleanText, extractDomain } from './utils';
 import { detectPlatform, getPlatformConfig } from './platforms';
@@ -58,32 +58,22 @@ export async function scrapeUrl(
 
     // Launch browser with appropriate configuration
     if (isProduction) {
-      // Vercel production: use puppeteer-core with @sparticuz/chromium
+      // Vercel production: use puppeteer-core with @sparticuz/chromium-min
 
-      // Force-disable graphics mode to reduce footprint
-      try {
-        (chromium as any).setGraphicsMode = false;
-      } catch (e) {
-        console.log('[Scraper] setGraphicsMode not available in this version');
-      }
-
-      const execPath = await chromium.executablePath();
+      // Use remote binary URL for chromium-min
+      const execPath = await chromium.executablePath(
+        'https://github.com/nickreese/nickreese/releases/download/chromium-v119.0.2-pack/chromium-v119.0.2-pack.tar'
+      );
       console.log('[Scraper] Chromium executable path:', execPath);
 
       browser = await puppeteerCore.launch({
-        args: [
-          ...chromium.args,
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--single-process',
-        ],
-        defaultViewport: { width: 1920, height: 1080 },
+        args: chromium.args,
         executablePath: execPath,
-        headless: true,
+        headless: chromium.headless,
+        defaultViewport: { width: 1920, height: 1080 },
       }) as any;
-      console.log('[Scraper] Browser launched successfully in production');
+
+      console.log('[Scraper] Browser launched successfully');
     } else {
       // Local development: use standard puppeteer
       browser = await puppeteer.launch({
