@@ -24,6 +24,7 @@ import { generateContentHash } from './utils';
  * const logId = await startScraperLog(sourceId);
  */
 export async function startScraperLog(sourceId: string): Promise<string> {
+  console.log(`[Persistence] Starting scraper log for source: ${sourceId}`);
   const supabase = createServiceClient();
 
   const logData: ScraperLogInsert = {
@@ -32,6 +33,7 @@ export async function startScraperLog(sourceId: string): Promise<string> {
     started_at: new Date().toISOString(),
   };
 
+  console.log(`[Persistence] Inserting log data:`, JSON.stringify(logData, null, 2));
   const { data, error } = await supabase
     .from('scraper_logs')
     .insert(logData)
@@ -39,11 +41,11 @@ export async function startScraperLog(sourceId: string): Promise<string> {
     .single();
 
   if (error) {
-    console.error('[Persistence] Failed to start scraper log:', error);
+    console.error('[Persistence] ❌ Failed to start scraper log:', error);
     throw new Error(`Failed to start scraper log: ${error.message}`);
   }
 
-  console.log(`[Persistence] Started scraper log: ${data.id}`);
+  console.log(`[Persistence] ✅ Started scraper log: ${data.id}`);
   return data.id;
 }
 

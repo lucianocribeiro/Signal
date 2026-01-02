@@ -31,15 +31,29 @@ export async function scrapeAndSave(source: SourceRecord): Promise<{
 }> {
   const startTime = Date.now();
 
-  console.log(`\n[Scrape & Save] Starting scrape for: ${source.name}`);
+  console.log(`\n[Scrape & Save] ========== Starting scrape ==========`);
+  console.log(`[Scrape & Save] Source Name: ${source.name}`);
+  console.log(`[Scrape & Save] Source ID: ${source.id}`);
   console.log(`[Scrape & Save] URL: ${source.url}`);
+  console.log(`[Scrape & Save] Platform: ${source.platform}`);
+  console.log(`[Scrape & Save] Project ID: ${source.project_id}`);
 
   try {
     // Scrape the URL
+    console.log(`[Scrape & Save] Calling scrapeUrl('${source.url}')...`);
     const scrapeResult = await scrapeUrl(source.url);
+    console.log(`[Scrape & Save] scrapeUrl returned:`, JSON.stringify({
+      success: scrapeResult.success,
+      hasContent: !!scrapeResult.content,
+      contentLength: scrapeResult.content?.text?.length || 0,
+      error: scrapeResult.error,
+      metadata: scrapeResult.metadata
+    }, null, 2));
 
     // Persist the result
+    console.log(`[Scrape & Save] Calling persistScrapeResult...`);
     const persistResult = await persistScrapeResult(source, scrapeResult);
+    console.log(`[Scrape & Save] persistScrapeResult returned:`, JSON.stringify(persistResult, null, 2));
 
     const executionTimeMs = Date.now() - startTime;
 

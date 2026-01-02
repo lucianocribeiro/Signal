@@ -61,9 +61,15 @@ export async function POST(
       );
     }
 
-    console.log(`[Project Scrape] Manual refresh triggered for project: ${project.name}`);
+    console.log(`[Project Scrape] === Manual refresh triggered ===`);
+    console.log(`[Project Scrape] Project ID: ${projectId}`);
+    console.log(`[Project Scrape] Project Name: ${project.name}`);
+    console.log(`[Project Scrape] Owner ID: ${project.owner_id}`);
 
     // Get all active sources for this project
+    console.log(`[Project Scrape] Fetching sources from database...`);
+    console.log(`[Project Scrape] Query: SELECT * FROM sources WHERE project_id = '${projectId}' AND is_active = true`);
+
     const supabaseService = createServiceClient();
     const { data: sources, error: sourcesError } = await supabaseService
       .from('sources')
@@ -71,8 +77,13 @@ export async function POST(
       .eq('project_id', projectId)
       .eq('is_active', true);
 
+    console.log(`[Project Scrape] Database query completed`);
+    console.log(`[Project Scrape] Sources error:`, sourcesError);
+    console.log(`[Project Scrape] Sources found:`, sources?.length || 0);
+    console.log(`[Project Scrape] Sources data:`, JSON.stringify(sources, null, 2));
+
     if (sourcesError) {
-      console.error('[Project Scrape] Error fetching sources:', sourcesError);
+      console.error('[Project Scrape] ❌ Error fetching sources:', sourcesError);
       return NextResponse.json(
         { error: 'Error al obtener fuentes' },
         { status: 500 }
@@ -80,7 +91,7 @@ export async function POST(
     }
 
     if (!sources || sources.length === 0) {
-      console.log(`[Project Scrape] No active sources found for project ${project.name}`);
+      console.log(`[Project Scrape] ⚠️ No active sources found for project ${project.name}`);
       return NextResponse.json({
         success: true,
         projectId,
@@ -94,7 +105,7 @@ export async function POST(
       });
     }
 
-    console.log(`[Project Scrape] Scraping ${sources.length} sources for project ${project.name}`);
+    console.log(`[Project Scrape] ✅ Starting scrape of ${sources.length} sources for project ${project.name}`);
 
     // Scrape all sources in parallel with concurrency limit
     const limit = pLimit(CONCURRENT_SCRAPES);
@@ -106,7 +117,13 @@ export async function POST(
     const scrapePromises = sources.map((source: any, index: number) =>
       limit(async () => {
         try {
-          console.log(`[Project Scrape] Scraping: ${source.name}`);
+          console.log(`\n[Project Scrape] === Processing source ${index + 1}/${sources.length} ===`);
+          console.log(`[Project Scrape] Source ID: ${source.id}`);
+          console.log(`[Project Scrape] Source Name: ${source.name}`);
+          console.log(`[Project Scrape] Source URL: ${source.url}`);
+          console.log(`[Project Scrape] Platform: ${source.platform}`);
+          console.log(`[Project Scrape] Is Active: ${source.is_active}`);
+          console.log(`[Project Scrape] Last Fetch: ${source.last_fetch_at}`);
 
           const sourceRecord: SourceRecord = {
             id: source.id,
@@ -118,40 +135,59 @@ export async function POST(
             last_fetch_at: source.last_fetch_at,
           };
 
+          console.log(`[Project Scrape] Calling scrapeAndSave...`);
           const result = await scrapeAndSave(sourceRecord);
+          console.log(`[Project Scrape] scrapeAndSave returned:`, JSON.stringify(result, null, 2));
 
           if (result.success) {
             successful++;
             if (result.duplicate) {
               duplicates++;
+              console.log(`[Project Scrape] ⚠️ Duplicate content for ${source.name}`);
+            } else {
+              console.log(`[Project Scrape] ✅ Successfully scraped ${source.name}`);
             }
           } else {
             failed++;
             errors.push(`${source.name}: ${result.error || 'Error desconocido'}`);
+            console.error(`[Project Scrape] ❌ Failed to scrape ${source.name}: ${result.error}`);
           }
 
           // Add delay between sources (rate limiting)
           if (index < sources.length - 1) {
+            console.log(`[Project Scrape] Waiting ${DELAY_BETWEEN_SOURCES_MS}ms before next source...`);
             await delay(DELAY_BETWEEN_SOURCES_MS);
           }
         } catch (error) {
           failed++;
           const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
           errors.push(`${source.name}: ${errorMsg}`);
-          console.error(`[Project Scrape] Error scraping ${source.name}:`, error);
+          console.error(`[Project Scrape] ❌ Exception scraping ${source.name}:`, error);
+          console.error(`[Project Scrape] Stack trace:`, error instanceof Error ? error.stack : 'N/A');
         }
       })
     );
 
     // Wait for all sources to complete
+    console.log(`[Project Scrape] Waiting for all ${scrapePromises.length} scrape operations to complete...`);
     await Promise.all(scrapePromises);
+    console.log(`[Project Scrape] All scrape operations completed`);
 
     // Update project's last_refresh_at
+    console.log(`[Project Scrape] Updating project last_refresh_at...`);
     await updateProjectLastRefresh(projectId);
 
     const executionTimeMs = Date.now() - startTime;
 
-    console.log(`[Project Scrape] Complete for ${project.name}: ${successful} successful, ${failed} failed, ${duplicates} duplicates`);
+    console.log(`\n[Project Scrape] ========== FINAL SUMMARY ==========`);
+    console.log(`[Project Scrape] Project: ${project.name}`);
+    console.log(`[Project Scrape] Total sources: ${sources.length}`);
+    console.log(`[Project Scrape] Successful: ${successful}`);
+    console.log(`[Project Scrape] Failed: ${failed}`);
+    console.log(`[Project Scrape] Duplicates: ${duplicates}`);
+    console.log(`[Project Scrape] Execution time: ${executionTimeMs}ms`);
+    console.log(`[Project Scrape] Errors:`, errors);
+    console.log(`[Project Scrape] ===================================\n`);
 
     return NextResponse.json({
       success: errors.length === 0,
