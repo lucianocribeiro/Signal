@@ -1,4 +1,4 @@
-import { JSDOM } from 'jsdom';
+import { JSDOM, VirtualConsole } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 
 export interface FastPathResult {
@@ -96,7 +96,23 @@ export async function scrapeWithReadability(url: string): Promise<FastPathResult
     }
 
     const html = await response.text();
-    const dom = new JSDOM(html, { url });
+
+    // Configure JSDOM to suppress CSS parsing errors
+    const virtualConsole = new VirtualConsole();
+    virtualConsole.on('error', () => {
+      // Suppress JSDOM errors (e.g., CSS parsing)
+    });
+    virtualConsole.on('warn', () => {
+      // Suppress JSDOM warnings
+    });
+
+    const dom = new JSDOM(html, {
+      url,
+      resources: 'usable',
+      pretendToBeVisual: false,
+      virtualConsole
+    });
+
     const reader = new Readability(dom.window.document);
     const article = reader.parse();
 
