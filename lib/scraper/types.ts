@@ -35,7 +35,7 @@ export interface ScraperResult {
     /** Whether the page was scrolled */
     scrolled?: boolean;
     /** Method used for content extraction */
-    extractionMethod?: 'platform-specific' | 'fallback';
+    extractionMethod?: string;
   };
 }
 
