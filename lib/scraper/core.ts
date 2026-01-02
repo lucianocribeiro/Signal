@@ -136,13 +136,21 @@ export async function scrapeUrl(
     // Launch browser with appropriate configuration
     if (isProduction) {
       // Vercel production: use puppeteer-core with @sparticuz/chromium-min
+      // Downloads binary to /tmp at runtime (avoids 50MB bundle limit)
       const execPath = await chromium.executablePath(
-        'https://github.com/nickreese/nickreese/releases/download/chromium-v119.0.2-pack/chromium-v119.0.2-pack.tar'
+        'https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar'
       );
       console.log('[Scraper] Chromium executable path:', execPath);
 
       browser = await puppeteerCore.launch({
-        args: chromium.args,
+        args: [
+          ...chromium.args,
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--disable-setuid-sandbox',
+          '--no-sandbox',
+          '--single-process', // Critical for Vercel serverless
+        ],
         executablePath: execPath,
         headless: chromium.headless,
         defaultViewport: { width: 1920, height: 1080 },
