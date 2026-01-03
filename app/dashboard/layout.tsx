@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Radio, FolderKanban, Settings, ChevronDown, User, LogOut, Loader2, Users, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Radio, FolderKanban, Settings, ChevronDown, User, LogOut, Loader2, Users, ChevronLeft, ChevronRight, Bug } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -142,7 +142,7 @@ export default function DashboardLayout({
               <Link
                 href="/dashboard/admin/users"
                 className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                  isActive('/dashboard/admin')
+                  isActive('/dashboard/admin/users')
                     ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
                 }`}
@@ -150,6 +150,22 @@ export default function DashboardLayout({
               >
                 <Users className="h-5 w-5 flex-shrink-0" />
                 {!isSidebarCollapsed && <span>Usuarios</span>}
+              </Link>
+            )}
+
+            {/* Admin Debug Link - Only visible to admins */}
+            {profile?.role === 'admin' && (
+              <Link
+                href="/dashboard/admin/debug"
+                className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
+                  isActive('/dashboard/admin/debug')
+                    ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+                }`}
+                title={isSidebarCollapsed ? 'Debug' : undefined}
+              >
+                <Bug className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && <span>Debug</span>}
               </Link>
             )}
 
