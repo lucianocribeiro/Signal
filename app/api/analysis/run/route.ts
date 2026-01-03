@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { runFullAnalysis } from '@/lib/analysis/runFullAnalysis';
+import { getGeminiModel } from '@/lib/ai/gemini';
 import type { FullAnalysisResult } from '@/types/analysis';
 
 export const dynamic = 'force-dynamic';
@@ -70,6 +71,30 @@ async function verifyAuth(
  * }
  */
 export async function POST(request: NextRequest) {
+  // Early initialization check for Gemini AI
+  try {
+    console.log('[Full Analysis API] Verifying Gemini initialization...');
+    getGeminiModel();
+    console.log('[Full Analysis API] ✅ Gemini initialized successfully');
+  } catch (initError) {
+    console.error('[Full Analysis API] ❌ Failed to initialize Gemini:', initError);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'AI service unavailable. Configuration error.',
+        details: initError instanceof Error ? initError.message : 'Unknown error',
+        new_signals: { count: 0, signals: [], ingestions_analyzed: 0 },
+        momentum_updates: { count: 0, updated_signals: [], unchanged_count: 0 },
+        token_usage: {
+          detection: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, estimated_cost: 0 },
+          momentum: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, estimated_cost: 0 },
+          total: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, estimated_cost: 0 },
+        },
+      },
+      { status: 500 }
+    );
+  }
+
   try {
     // Step 1: Verify authentication
     const authResult = await verifyAuth(request);

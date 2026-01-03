@@ -12,16 +12,35 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
  * @throws Error if API key is not configured
  */
 function initializeGemini() {
+  console.log('[Gemini Init] ================================');
+  console.log('[Gemini Init] Environment:', process.env.NODE_ENV);
+  console.log('[Gemini Init] Vercel Env:', process.env.VERCEL_ENV);
+
   const apiKey = process.env.GOOGLE_AI_API_KEY;
 
-  console.log('[Gemini Init] Checking API Key...');
-  console.log('[Gemini Init] Key exists:', !!apiKey);
-  console.log('[Gemini Init] Key length:', apiKey ? apiKey.length : 0);
-  console.log('[Gemini Init] Environment:', process.env.NODE_ENV);
-
   if (!apiKey) {
-    throw new Error('Missing GOOGLE_AI_API_KEY environment variable');
+    // Log available env var names (NOT values) for debugging
+    const allKeys = Object.keys(process.env);
+    const googleKeys = allKeys.filter(k => k.includes('GOOGLE'));
+    const apiKeyVars = allKeys.filter(k => k.includes('API_KEY'));
+
+    console.error('[Gemini Init] ❌ GOOGLE_AI_API_KEY is MISSING');
+    console.error('[Gemini Init] GOOGLE_* variables found:', googleKeys.length > 0 ? googleKeys : 'NONE');
+    console.error('[Gemini Init] *_API_KEY variables found:', apiKeyVars.length > 0 ? apiKeyVars : 'NONE');
+    console.error('[Gemini Init] Total env vars visible:', allKeys.length);
+    console.error('[Gemini Init] Sample env var names (first 10):', allKeys.slice(0, 10));
+    console.log('[Gemini Init] ================================');
+
+    throw new Error(
+      'GOOGLE_AI_API_KEY environment variable is not set. ' +
+      'Verify in Vercel Dashboard: Settings → Environment Variables → ' +
+      'Ensure Production/Preview/Development are ALL checked.'
+    );
   }
+
+  console.log('[Gemini Init] ✅ API key found (length:', apiKey.length, 'chars)');
+  console.log('[Gemini Init] ✅ Initializing Google Generative AI...');
+  console.log('[Gemini Init] ================================');
 
   return new GoogleGenerativeAI(apiKey);
 }
