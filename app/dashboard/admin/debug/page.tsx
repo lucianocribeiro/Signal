@@ -7,9 +7,13 @@ interface ScrapeResult {
   id: string;
   url: string;
   platform: string;
+  source_name: string;
   scraped_at: string;
   has_content: boolean;
   content_length: number;
+  processed: boolean;
+  has_error: boolean;
+  error_message?: string;
 }
 
 interface ScrapeStatusResponse {
@@ -92,27 +96,32 @@ export default function DebugPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-800">
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium">URL</th>
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Source</th>
                       <th className="text-left py-3 px-4 text-gray-400 font-medium">Platform</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Scraped At</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Has Content</th>
-                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Content Size</th>
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Ingested At</th>
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Data Size</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.recent_scrapes.map((scrape) => (
                       <tr key={scrape.id} className="border-b border-gray-800 hover:bg-gray-900/50">
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <LinkIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                            <a
-                              href={scrape.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-signal-500 hover:text-signal-400 truncate max-w-md"
-                            >
-                              {scrape.url}
-                            </a>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <LinkIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                              <span className="text-gray-200 font-medium">{scrape.source_name}</span>
+                            </div>
+                            {scrape.url !== 'N/A' && (
+                              <a
+                                href={scrape.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-signal-500 hover:text-signal-400 truncate block max-w-md ml-6"
+                              >
+                                {scrape.url}
+                              </a>
+                            )}
                           </div>
                         </td>
                         <td className="py-3 px-4">
@@ -129,15 +138,30 @@ export default function DebugPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                              scrape.has_content
-                                ? 'bg-green-950/20 text-green-400 border border-green-900/30'
-                                : 'bg-red-950/20 text-red-400 border border-red-900/30'
-                            }`}
-                          >
-                            {scrape.has_content ? 'Yes' : 'No'}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium w-fit ${
+                                scrape.processed
+                                  ? 'bg-blue-950/20 text-blue-400 border border-blue-900/30'
+                                  : 'bg-yellow-950/20 text-yellow-400 border border-yellow-900/30'
+                              }`}
+                            >
+                              {scrape.processed ? 'Processed' : 'Pending'}
+                            </span>
+                            {scrape.has_error && (
+                              <span
+                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-950/20 text-red-400 border border-red-900/30 w-fit"
+                                title={scrape.error_message}
+                              >
+                                Error
+                              </span>
+                            )}
+                            {scrape.has_content && (
+                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-950/20 text-green-400 border border-green-900/30 w-fit">
+                                Has Data
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-right text-gray-300">
                           {scrape.content_length > 0 ? (
