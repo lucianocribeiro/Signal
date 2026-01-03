@@ -3,29 +3,31 @@
 import { useState, useEffect } from 'react';
 import { Bug, RefreshCw, Database, Clock, Link as LinkIcon } from 'lucide-react';
 
-interface ScrapeResult {
+interface IngestionResult {
   id: string;
   source_id: string;
   url: string;
   platform: string;
   source_name: string;
   ingested_at: string;
-  has_content: boolean;
-  content_length: number;
-  content_preview: string;
-  metadata: any;
+  processed: boolean;
+  processed_at: string | null;
+  has_error: boolean;
+  error_message: string | null;
+  raw_data_keys: string[];
+  raw_data_preview: string;
 }
 
 interface DatabaseStatus {
-  total_raw_ingestions: number;
+  total_ingestions: number;
+  unprocessed_ingestions: number;
   total_signals: number;
   total_sources: number;
-  total_evidence_links: number;
 }
 
 interface ScrapeStatusResponse {
   database_status: DatabaseStatus;
-  recent_scrapes: ScrapeResult[];
+  recent_ingestions: IngestionResult[];
   error?: string;
 }
 
@@ -94,8 +96,12 @@ export default function DebugPage() {
             {/* Database Status Summary */}
             <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-gray-900 rounded-lg">
-                <p className="text-xs text-gray-500 mb-1">Raw Ingestions</p>
-                <p className="text-2xl font-bold text-signal-500">{data.database_status.total_raw_ingestions}</p>
+                <p className="text-xs text-gray-500 mb-1">Total Ingestions</p>
+                <p className="text-2xl font-bold text-signal-500">{data.database_status.total_ingestions}</p>
+              </div>
+              <div className="p-4 bg-gray-900 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Unprocessed</p>
+                <p className="text-2xl font-bold text-yellow-400">{data.database_status.unprocessed_ingestions}</p>
               </div>
               <div className="p-4 bg-gray-900 rounded-lg">
                 <p className="text-xs text-gray-500 mb-1">Signals</p>
@@ -105,14 +111,10 @@ export default function DebugPage() {
                 <p className="text-xs text-gray-500 mb-1">Sources</p>
                 <p className="text-2xl font-bold text-green-400">{data.database_status.total_sources}</p>
               </div>
-              <div className="p-4 bg-gray-900 rounded-lg">
-                <p className="text-xs text-gray-500 mb-1">Evidence Links</p>
-                <p className="text-2xl font-bold text-purple-400">{data.database_status.total_evidence_links}</p>
-              </div>
             </div>
 
             {/* Results Table */}
-            {data.recent_scrapes && data.recent_scrapes.length > 0 ? (
+            {data.recent_ingestions && data.recent_ingestions.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -120,61 +122,76 @@ export default function DebugPage() {
                       <th className="text-left py-3 px-4 text-gray-400 font-medium">Source</th>
                       <th className="text-left py-3 px-4 text-gray-400 font-medium">Platform</th>
                       <th className="text-left py-3 px-4 text-gray-400 font-medium">Ingested At</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Content Preview</th>
-                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Size</th>
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Data Preview</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.recent_scrapes.map((scrape) => (
-                      <tr key={scrape.id} className="border-b border-gray-800 hover:bg-gray-900/50">
+                    {data.recent_ingestions.map((ingestion) => (
+                      <tr key={ingestion.id} className="border-b border-gray-800 hover:bg-gray-900/50">
                         <td className="py-3 px-4">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <LinkIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                              <span className="text-gray-200 font-medium">{scrape.source_name}</span>
+                              <span className="text-gray-200 font-medium">{ingestion.source_name}</span>
                             </div>
-                            {scrape.url !== 'N/A' && (
+                            {ingestion.url !== 'N/A' && (
                               <a
-                                href={scrape.url}
+                                href={ingestion.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-xs text-signal-500 hover:text-signal-400 truncate block max-w-md ml-6"
                               >
-                                {scrape.url}
+                                {ingestion.url}
                               </a>
                             )}
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-800 text-gray-300">
-                            {scrape.platform}
+                            {ingestion.platform}
                           </span>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2 text-gray-400">
                             <Clock className="h-4 w-4" />
                             <span className="text-sm">
-                              {new Date(scrape.ingested_at).toLocaleString()}
+                              {new Date(ingestion.ingested_at).toLocaleString()}
                             </span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="max-w-md">
-                            {scrape.has_content ? (
-                              <p className="text-sm text-gray-400 truncate" title={scrape.content_preview}>
-                                {scrape.content_preview}
-                              </p>
-                            ) : (
-                              <span className="text-sm text-gray-600 italic">No content</span>
+                          <div className="flex flex-col gap-1">
+                            <span
+                              className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium w-fit ${
+                                ingestion.processed
+                                  ? 'bg-green-950/20 text-green-400 border border-green-900/30'
+                                  : 'bg-yellow-950/20 text-yellow-400 border border-yellow-900/30'
+                              }`}
+                            >
+                              {ingestion.processed ? 'Processed' : 'Pending'}
+                            </span>
+                            {ingestion.has_error && (
+                              <span
+                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-950/20 text-red-400 border border-red-900/30 w-fit"
+                                title={ingestion.error_message || 'Error'}
+                              >
+                                Error
+                              </span>
+                            )}
+                            {ingestion.raw_data_keys.length > 0 && (
+                              <span className="text-xs text-gray-500">
+                                Keys: {ingestion.raw_data_keys.join(', ')}
+                              </span>
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right text-gray-300">
-                          {scrape.content_length > 0 ? (
-                            <span>{scrape.content_length.toLocaleString()} chars</span>
-                          ) : (
-                            <span className="text-gray-500">-</span>
-                          )}
+                        <td className="py-3 px-4">
+                          <div className="max-w-md">
+                            <p className="text-sm text-gray-400 truncate" title={ingestion.raw_data_preview}>
+                              {ingestion.raw_data_preview}
+                            </p>
+                          </div>
                         </td>
                       </tr>
                     ))}
