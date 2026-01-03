@@ -5,20 +5,28 @@ import { Bug, RefreshCw, Database, Clock, Link as LinkIcon } from 'lucide-react'
 
 interface ScrapeResult {
   id: string;
+  source_id: string;
   url: string;
   platform: string;
   source_name: string;
-  scraped_at: string;
+  ingested_at: string;
   has_content: boolean;
   content_length: number;
-  processed: boolean;
-  has_error: boolean;
-  error_message?: string;
+  content_preview: string;
+  metadata: any;
+}
+
+interface DatabaseStatus {
+  total_raw_ingestions: number;
+  total_signals: number;
+  total_sources: number;
+  total_evidence_links: number;
 }
 
 interface ScrapeStatusResponse {
-  total_results: number;
+  database_status: DatabaseStatus;
   recent_scrapes: ScrapeResult[];
+  error?: string;
 }
 
 export default function DebugPage() {
@@ -83,11 +91,24 @@ export default function DebugPage() {
 
         {data && (
           <>
-            {/* Summary */}
-            <div className="mb-6 p-4 bg-gray-900 rounded-lg">
-              <p className="text-gray-400">
-                Total recent results: <span className="text-signal-500 font-semibold">{data.total_results}</span>
-              </p>
+            {/* Database Status Summary */}
+            <div className="mb-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-4 bg-gray-900 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Raw Ingestions</p>
+                <p className="text-2xl font-bold text-signal-500">{data.database_status.total_raw_ingestions}</p>
+              </div>
+              <div className="p-4 bg-gray-900 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Signals</p>
+                <p className="text-2xl font-bold text-blue-400">{data.database_status.total_signals}</p>
+              </div>
+              <div className="p-4 bg-gray-900 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Sources</p>
+                <p className="text-2xl font-bold text-green-400">{data.database_status.total_sources}</p>
+              </div>
+              <div className="p-4 bg-gray-900 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Evidence Links</p>
+                <p className="text-2xl font-bold text-purple-400">{data.database_status.total_evidence_links}</p>
+              </div>
             </div>
 
             {/* Results Table */}
@@ -99,8 +120,8 @@ export default function DebugPage() {
                       <th className="text-left py-3 px-4 text-gray-400 font-medium">Source</th>
                       <th className="text-left py-3 px-4 text-gray-400 font-medium">Platform</th>
                       <th className="text-left py-3 px-4 text-gray-400 font-medium">Ingested At</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
-                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Data Size</th>
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Content Preview</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Size</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -133,33 +154,18 @@ export default function DebugPage() {
                           <div className="flex items-center gap-2 text-gray-400">
                             <Clock className="h-4 w-4" />
                             <span className="text-sm">
-                              {new Date(scrape.scraped_at).toLocaleString()}
+                              {new Date(scrape.ingested_at).toLocaleString()}
                             </span>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex flex-col gap-1">
-                            <span
-                              className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium w-fit ${
-                                scrape.processed
-                                  ? 'bg-blue-950/20 text-blue-400 border border-blue-900/30'
-                                  : 'bg-yellow-950/20 text-yellow-400 border border-yellow-900/30'
-                              }`}
-                            >
-                              {scrape.processed ? 'Processed' : 'Pending'}
-                            </span>
-                            {scrape.has_error && (
-                              <span
-                                className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-950/20 text-red-400 border border-red-900/30 w-fit"
-                                title={scrape.error_message}
-                              >
-                                Error
-                              </span>
-                            )}
-                            {scrape.has_content && (
-                              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-950/20 text-green-400 border border-green-900/30 w-fit">
-                                Has Data
-                              </span>
+                          <div className="max-w-md">
+                            {scrape.has_content ? (
+                              <p className="text-sm text-gray-400 truncate" title={scrape.content_preview}>
+                                {scrape.content_preview}
+                              </p>
+                            ) : (
+                              <span className="text-sm text-gray-600 italic">No content</span>
                             )}
                           </div>
                         </td>
