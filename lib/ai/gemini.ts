@@ -14,6 +14,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 function initializeGemini() {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
 
+  console.log('[Gemini Init] Checking API Key...');
+  console.log('[Gemini Init] Key exists:', !!apiKey);
+  console.log('[Gemini Init] Key length:', apiKey ? apiKey.length : 0);
+  console.log('[Gemini Init] Environment:', process.env.NODE_ENV);
+
   if (!apiKey) {
     throw new Error('Missing GOOGLE_AI_API_KEY environment variable');
   }
