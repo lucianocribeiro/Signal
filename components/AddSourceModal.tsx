@@ -10,9 +10,52 @@ interface AddSourceModalProps {
   onSourceAdded: () => void;
 }
 
+// Platform options
+const platformOptions = [
+  { value: 'news', label: 'Noticias (RSS/Artículos)' },
+  { value: 'x_twitter', label: 'X (Twitter)' },
+  { value: 'reddit', label: 'Reddit' },
+  { value: 'other', label: 'Otro' }
+];
+
+// Auto-detect platform from URL
+function detectPlatformFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+
+    // X/Twitter detection
+    if (hostname.includes('x.com') || hostname.includes('twitter.com')) {
+      return 'x_twitter';
+    }
+
+    // Reddit detection
+    if (hostname.includes('reddit.com')) {
+      return 'reddit';
+    }
+
+    // RSS/News detection (common patterns)
+    if (url.includes('/rss') || url.includes('/feed') || url.includes('.xml')) {
+      return 'news';
+    }
+
+    // Default to news for news domains
+    const newsDomains = ['lanacion.com.ar', 'clarin.com', 'infobae.com', 'pagina12.com.ar'];
+    if (newsDomains.some(domain => hostname.includes(domain))) {
+      return 'news';
+    }
+
+    return 'other';
+  } catch {
+    return 'other';
+  }
+}
+
 export default function AddSourceModal({ isOpen, onClose, projectId, onSourceAdded }: AddSourceModalProps) {
   const [url, setUrl] = useState('');
   const [name, setName] = useState('');
+  const [platform, setPlatform] = useState('news');
+  const [manuallySelectedPlatform, setManuallySelectedPlatform] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -21,6 +64,8 @@ export default function AddSourceModal({ isOpen, onClose, projectId, onSourceAdd
   const resetForm = () => {
     setUrl('');
     setName('');
+    setPlatform('news');
+    setManuallySelectedPlatform(false);
     setError(null);
     setSuccess(false);
   };
@@ -70,6 +115,7 @@ export default function AddSourceModal({ isOpen, onClose, projectId, onSourceAdd
           project_id: projectId,
           url: url.trim(),
           name: name.trim() || null,
+          source_type: platform,
         }),
       });
 
@@ -126,8 +172,17 @@ export default function AddSourceModal({ isOpen, onClose, projectId, onSourceAdd
               type="url"
               id="url"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://twitter.com/usuario"
+              onChange={(e) => {
+                const newUrl = e.target.value;
+                setUrl(newUrl);
+
+                // Auto-detect and set platform if not manually selected
+                if (newUrl && !manuallySelectedPlatform) {
+                  const detected = detectPlatformFromUrl(newUrl);
+                  setPlatform(detected);
+                }
+              }}
+              placeholder="https://x.com/LANACION"
               className="w-full px-4 py-2.5 bg-black border border-gray-800 rounded-lg text-gray-100 placeholder-gray-600 focus:outline-none focus:border-signal-500 focus:ring-1 focus:ring-signal-500 transition-colors"
               disabled={isSubmitting || success}
               required
@@ -135,6 +190,48 @@ export default function AddSourceModal({ isOpen, onClose, projectId, onSourceAdd
             <p className="mt-1.5 text-xs text-gray-500">
               Ejemplos: Twitter, Reddit, o cualquier sitio web de noticias
             </p>
+          </div>
+
+          {/* Platform Selector */}
+          <div>
+            <label htmlFor="platform" className="block text-sm font-medium text-gray-300 mb-2">
+              Tipo de Plataforma <span className="text-red-400">*</span>
+            </label>
+            <select
+              id="platform"
+              value={platform}
+              onChange={(e) => {
+                setPlatform(e.target.value);
+                setManuallySelectedPlatform(true);
+              }}
+              className="w-full px-4 py-2.5 bg-black border border-gray-800 rounded-lg text-gray-100 focus:outline-none focus:border-signal-500 focus:ring-1 focus:ring-signal-500 transition-colors"
+              disabled={isSubmitting || success}
+              required
+            >
+              {platformOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {platform === 'x_twitter' && !manuallySelectedPlatform && (
+              <p className="text-sm text-green-400 mt-1.5 flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4" />
+                Detectado como fuente de X (Twitter)
+              </p>
+            )}
+            {platform === 'reddit' && !manuallySelectedPlatform && (
+              <p className="text-sm text-green-400 mt-1.5 flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4" />
+                Detectado como fuente de Reddit
+              </p>
+            )}
+            {platform === 'news' && !manuallySelectedPlatform && url && (
+              <p className="text-sm text-green-400 mt-1.5 flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4" />
+                Detectado como fuente de noticias
+              </p>
+            )}
           </div>
 
           {/* Name Input (Optional) */}

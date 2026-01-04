@@ -5,16 +5,28 @@ import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 // Helper function to detect source type from URL (matches database enum)
-function detectSourceType(url: string): 'twitter' | 'reddit' | 'news' {
+function detectSourceType(url: string): 'x_twitter' | 'reddit' | 'news' | 'other' {
   const urlLower = url.toLowerCase();
 
   if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) {
-    return 'twitter';
+    return 'x_twitter';
   }
   if (urlLower.includes('reddit.com')) {
     return 'reddit';
   }
-  return 'news';
+
+  // RSS/News detection
+  if (url.includes('/rss') || url.includes('/feed') || url.includes('.xml')) {
+    return 'news';
+  }
+
+  // Default to news for common news domains
+  const newsDomains = ['lanacion.com.ar', 'clarin.com', 'infobae.com', 'pagina12.com.ar'];
+  if (newsDomains.some(domain => urlLower.includes(domain))) {
+    return 'news';
+  }
+
+  return 'other';
 }
 
 // Helper function to validate URL format
@@ -41,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { project_id, url, name } = body;
+    const { project_id, url, name, source_type } = body;
 
     // Validate required fields
     if (!project_id || typeof project_id !== 'string') {
@@ -108,8 +120,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 3: Detect source type from URL
-    const sourceType = detectSourceType(url);
+    // Step 3: Use provided source_type or detect from URL
+    const sourceType = source_type || detectSourceType(url);
 
     // Extract hostname for default name if not provided
     let displayName = name?.trim() || null;
