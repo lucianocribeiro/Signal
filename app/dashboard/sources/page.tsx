@@ -6,6 +6,7 @@ import { useProjects } from '@/contexts/ProjectContext';
 import AddSourceModal from '@/components/AddSourceModal';
 import SourcesList from '@/components/SourcesList';
 import DeleteSourceConfirmModal from '@/components/DeleteSourceConfirmModal';
+import { UrlBestPracticesInfo } from '@/components/ui/url-best-practices-info';
 
 interface Source {
   id: string;
@@ -280,6 +281,8 @@ export default function SourcesPage() {
             <p className="text-red-400">{error}</p>
           </div>
         )}
+
+        <UrlBestPracticesInfo />
 
         {/* Sources List */}
         <div>
