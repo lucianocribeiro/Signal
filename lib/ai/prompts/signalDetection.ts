@@ -13,6 +13,7 @@ import type { RawIngestionForAnalysis } from '@/types/analysis';
  *
  * @param projectName - Name of the project being analyzed
  * @param signalInstructions - Client-specific guidance (e.g., "Monitorear menciones del candidato X")
+ * @param riskCriteria - User-defined risk criteria for the project
  * @param ingestions - Array of raw ingestions to analyze
  * @returns Object containing systemPrompt and userPrompt
  *
@@ -26,8 +27,18 @@ import type { RawIngestionForAnalysis } from '@/types/analysis';
 export function buildSignalDetectionPrompt(
   projectName: string,
   signalInstructions: string | null,
+  riskCriteria: string | null,
   ingestions: RawIngestionForAnalysis[]
 ): { systemPrompt: string; userPrompt: string } {
+  const customRiskSection = riskCriteria
+    ? `
+CRITERIOS DE RIESGO PERSONALIZADOS (del cliente - priorizar):
+${riskCriteria}
+
+Usa estos criterios como guía PRINCIPAL para clasificar el riesgo.
+Si el contenido coincide con ALGUNO de los criterios, clasifica como "watch_closely".`
+    : '';
+
   const systemPrompt = `Eres un analista de monitoreo narrativo para Agencia Kairos, una agencia de comunicación política y corporativa en Argentina.
 
 Tu rol es identificar SEÑALES EMERGENTES en datos capturados de redes sociales y noticias.
@@ -36,6 +47,14 @@ PROYECTO ACTUAL: "${projectName}"
 
 INSTRUCCIONES ESPECÍFICAS DEL CLIENTE:
 ${signalInstructions || 'Identificar narrativas emergentes relevantes que requieran atención.'}
+${customRiskSection}
+
+FACTORES DE RIESGO ESTÁNDAR (si no hay criterios personalizados):
+- Sentimiento: contenido fuertemente negativo = mayor riesgo
+- Velocidad: difusión rápida = mayor riesgo
+- Credibilidad de la fuente: medios relevantes = mayor riesgo
+- Impacto potencial: daño reputacional directo = mayor riesgo
+- Alcance: audiencia grande = mayor riesgo
 
 FILOSOFÍA: "Orientación, No Ejecución"
 - Detecta señales que requieren atención
@@ -50,6 +69,7 @@ REGLAS:
 4. Ignora ruido y contenido irrelevante a las instrucciones
 5. Máximo 10 señales por análisis
 6. Cada señal debe tener evidencia clara del contenido analizado
+7. Sé conservador con "watch_closely" salvo que haya evidencia clara de alta severidad
 
 FORMATO DE SALIDA:
 Responde ÚNICAMENTE con JSON válido. Sin explicaciones adicionales, sin markdown, solo el JSON.
@@ -59,12 +79,15 @@ Schema requerido:
   "signals": [
     {
       "headline": "string (máx 100 caracteres, título claro y conciso)",
-      "summary": "string (2-3 oraciones explicando la señal y su relevancia)",
-      "sources": ["url1", "url2"],
-      "raw_ingestion_ids": ["uuid1", "uuid2"],
-      "suggested_status": "New",
-      "suggested_momentum": "high | medium | low",
-      "tags": ["tag1", "tag2"]
+      "summary": "string (3-5 párrafos con contexto completo: QUÉ, QUIÉN, DÓNDE, POR QUÉ IMPORTA, HECHOS CLAVE, IMPACTO POTENCIAL)",
+      "key_points": ["Punto clave 1", "Punto clave 2", "Punto clave 3"],
+      "status": "New",
+      "momentum": "high | medium | low",
+      "risk_level": "watch_closely | monitor",
+      "tags": ["tag1", "tag2"],
+      "source_name": "Nombre de la fuente principal",
+      "source_url": "URL del contenido original",
+      "raw_ingestion_ids": ["uuid1", "uuid2"]
     }
   ],
   "analysis_notes": "string (breve nota sobre el análisis realizado)"

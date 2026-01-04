@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [projectName, setProjectName] = useState('');
   const [projectDescription, setProjectDescription] = useState('');
   const [signalInstructions, setSignalInstructions] = useState('');
+  const [riskCriteria, setRiskCriteria] = useState('');
   const [savingProject, setSavingProject] = useState(false);
   const [projectSuccess, setProjectSuccess] = useState(false);
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -54,6 +55,7 @@ export default function SettingsPage() {
       setProjectName(currentProject.name || '');
       setProjectDescription(currentProject.description || '');
       setSignalInstructions(currentProject.signal_instructions || '');
+      setRiskCriteria(currentProject.risk_criteria || '');
     }
   }, [currentProject]);
 
@@ -99,6 +101,7 @@ export default function SettingsPage() {
           name: projectName,
           description: projectDescription,
           signal_instructions: signalInstructions,
+          risk_criteria: riskCriteria,
         }),
       });
 
@@ -354,6 +357,48 @@ export default function SettingsPage() {
                   />
                   <p className="mt-2 text-xs text-gray-600">
                     Estas instrucciones guían a la IA sobre qué tipo de señales detectar para este proyecto.
+                  </p>
+                </div>
+
+                {/* Risk Criteria Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <span className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      Criterios de Riesgo Personalizados
+                      <span className="text-xs text-gray-600 font-normal">(Opcional)</span>
+                    </span>
+                  </label>
+
+                  <div className="mb-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
+                    <p className="text-xs text-gray-400 mb-2">
+                      <strong className="text-gray-300">¿Cómo usar este campo?</strong>
+                    </p>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Define qué situaciones representan un riesgo alto para tu proyecto.
+                      La IA usará estos criterios para clasificar señales como "Requiere Atención".
+                    </p>
+                    <p className="text-xs text-gray-500 mb-1">
+                      <strong className="text-gray-400">Ejemplos:</strong>
+                    </p>
+                    <ul className="text-xs text-gray-500 space-y-1 ml-3">
+                      <li>• "Menciones de corrupción o escándalos legales"</li>
+                      <li>• "Críticas en medios principales (La Nación, Clarín, Infobae)"</li>
+                      <li>• "Asociación con figuras controversiales"</li>
+                      <li>• "Contenido viral negativo (+1000 interacciones)"</li>
+                      <li>• "Quejas de clientes en redes sociales"</li>
+                    </ul>
+                  </div>
+
+                  <textarea
+                    value={riskCriteria}
+                    onChange={(e) => setRiskCriteria(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50 transition-colors resize-none"
+                    placeholder="Describe qué situaciones consideras de alto riesgo para este proyecto..."
+                  />
+                  <p className="mt-2 text-xs text-gray-600">
+                    Si no defines criterios, se usarán factores estándar (sentimiento negativo, viralidad, fuentes importantes).
                   </p>
                 </div>
 

@@ -146,6 +146,7 @@ export async function analyzeMomentum(
     const { systemPrompt, userPrompt } = buildMomentumAnalysisPrompt(
       projectContext.name,
       eligibleSignals,
+      projectContext.risk_criteria,
       ingestionsToAnalyze
     );
 
@@ -267,7 +268,7 @@ async function fetchOpenSignals(
 
   const { data, error } = await supabase
     .from('signals')
-    .select('id, headline, summary, status, momentum, detected_at, tags')
+    .select('id, headline, summary, status, momentum, risk_level, detected_at, tags')
     .eq('project_id', projectId)
     .in('status', ['New', 'Accelerating', 'Stabilizing'])
     .order('detected_at', { ascending: false });
@@ -389,12 +390,15 @@ async function updateSignalMomentum(
   const momentumHistory = existingMetadata.momentum_history || [];
 
   // Add new history entry
+  const nextRiskLevel = update.new_risk_level || originalSignal.risk_level || 'monitor';
   const newHistoryEntry = {
     checked_at: new Date().toISOString(),
     previous_status: originalSignal.status,
     new_status: update.new_status,
     previous_momentum: originalSignal.momentum,
     new_momentum: update.new_momentum,
+    previous_risk_level: originalSignal.risk_level || 'monitor',
+    new_risk_level: nextRiskLevel,
     reason: update.reason,
     supporting_ingestion_ids: update.supporting_ingestion_ids,
     evidence_count: update.supporting_ingestion_ids.length,
@@ -408,6 +412,7 @@ async function updateSignalMomentum(
     .update({
       status: update.new_status,
       momentum: update.new_momentum,
+      risk_level: nextRiskLevel,
       metadata: {
         ...existingMetadata,
         momentum_history: momentumHistory,
@@ -415,6 +420,7 @@ async function updateSignalMomentum(
         total_momentum_checks: (existingMetadata.total_momentum_checks || 0) + 1,
         last_momentum_reason: update.reason,
         last_supporting_ingestion_ids: update.supporting_ingestion_ids,
+        last_risk_level: nextRiskLevel,
       },
       updated_at: new Date().toISOString(),
     })
@@ -458,6 +464,7 @@ async function updateSignalMomentum(
     new_status: data.status,
     old_momentum: originalSignal.momentum,
     new_momentum: data.momentum,
+    new_risk_level: nextRiskLevel,
     reason: update.reason,
     updated_at: data.updated_at,
   };

@@ -19,6 +19,7 @@ export interface Project {
   name: string;
   description: string | null;
   signal_instructions: string | null;
+  risk_criteria?: string | null;
   created_at: string;
   updated_at: string;
   sources?: Source[];

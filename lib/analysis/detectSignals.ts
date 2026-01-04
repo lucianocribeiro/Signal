@@ -79,6 +79,7 @@ export async function detectNewSignals(
     const { systemPrompt, userPrompt } = buildSignalDetectionPrompt(
       projectContext.name,
       projectContext.signal_instructions,
+      projectContext.risk_criteria,
       ingestionsToAnalyze
     );
 
@@ -201,15 +202,20 @@ async function createSignalInDatabase(
       project_id: projectId,
       headline: detectedSignal.headline.substring(0, 100), // Ensure max 100 chars
       summary: detectedSignal.summary,
-      status: detectedSignal.suggested_status,
-      momentum: detectedSignal.suggested_momentum,
+      key_points: detectedSignal.key_points || [],
+      status: detectedSignal.status || 'New',
+      momentum: detectedSignal.momentum || 'medium',
+      risk_level: detectedSignal.risk_level || 'monitor',
       tags: detectedSignal.tags,
+      source_name: detectedSignal.source_name || null,
+      source_url: detectedSignal.source_url || null,
       metadata: {
         raw_ingestion_ids: detectedSignal.raw_ingestion_ids,
-        sources: detectedSignal.sources,
+        sources: detectedSignal.source_url ? [detectedSignal.source_url] : [],
         ai_model: 'gemini-1.5-flash',
-        ai_suggested_status: detectedSignal.suggested_status,
-        ai_suggested_momentum: detectedSignal.suggested_momentum,
+        ai_suggested_status: detectedSignal.status || 'New',
+        ai_suggested_momentum: detectedSignal.momentum || 'medium',
+        ai_suggested_risk_level: detectedSignal.risk_level || 'monitor',
       },
     })
     .select(
@@ -218,8 +224,12 @@ async function createSignalInDatabase(
       project_id,
       headline,
       summary,
+      key_points,
       status,
       momentum,
+      risk_level,
+      source_name,
+      source_url,
       tags,
       detected_at,
       metadata

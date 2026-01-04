@@ -13,6 +13,7 @@ import type { SignalForMomentumAnalysis, RawIngestionForAnalysis } from '@/types
  *
  * @param projectName - Name of the project being analyzed
  * @param existingSignals - Open signals to analyze for momentum changes
+ * @param riskCriteria - User-defined risk criteria for the project
  * @param recentIngestions - Recent content (24-48h) for momentum context
  * @returns Object containing systemPrompt and userPrompt
  *
@@ -26,13 +27,24 @@ import type { SignalForMomentumAnalysis, RawIngestionForAnalysis } from '@/types
 export function buildMomentumAnalysisPrompt(
   projectName: string,
   existingSignals: SignalForMomentumAnalysis[],
+  riskCriteria: string | null,
   recentIngestions: RawIngestionForAnalysis[]
 ): { systemPrompt: string; userPrompt: string } {
+  const customRiskSection = riskCriteria
+    ? `
+CRITERIOS DE RIESGO PERSONALIZADOS (del cliente):
+${riskCriteria}
+
+Prioriza estos criterios al reevaluar el nivel de riesgo.`
+    : '';
+
   const systemPrompt = `Eres un analista de momentum narrativo para Agencia Kairos, una agencia de comunicación política y corporativa en Argentina.
 
 Tu rol es evaluar si las SEÑALES EXISTENTES que ya detectamos están ganando fuerza (Accelerating) o estabilizándose (Stabilizing).
+También debes reevaluar si el NIVEL DE RIESGO debe cambiar.
 
 PROYECTO ACTUAL: "${projectName}"
+${customRiskSection}
 
 FILOSOFÍA: Análisis de Trayectoria
 - Evalúas la evolución de narrativas conocidas
@@ -77,6 +89,7 @@ REGLAS CRÍTICAS:
 4. Proporciona razones específicas citando el contenido
 5. Vincula IDs de ingestiones que apoyan tu análisis
 6. Sé conservador: solo marca cambios cuando la evidencia es contundente
+7. Cambia el nivel de riesgo solo si hay evidencia clara o coincide con criterios personalizados
 
 FORMATO DE SALIDA:
 Responde ÚNICAMENTE con JSON válido. Sin explicaciones adicionales, sin markdown, solo el JSON.
@@ -88,6 +101,7 @@ Schema requerido:
       "signal_id": "uuid",
       "new_status": "Accelerating" | "Stabilizing",
       "new_momentum": "high" | "medium" | "low",
+      "new_risk_level": "watch_closely" | "monitor",
       "reason": "Explicación específica del cambio observado con evidencia del contenido (máx 200 caracteres)",
       "supporting_ingestion_ids": ["uuid1", "uuid2"]
     }
@@ -112,6 +126,7 @@ Headline: ${signal.headline}
 Summary: ${signal.summary}
 Current Status: ${signal.status}
 Current Momentum: ${signal.momentum}
+Current Risk Level: ${signal.risk_level || 'monitor'}
 Detected: ${new Date(signal.detected_at).toLocaleString('es-AR')}
 Tags: ${signal.tags.join(', ')}`
     )

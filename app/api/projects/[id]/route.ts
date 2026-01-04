@@ -91,7 +91,7 @@ export async function PATCH(
 
     // Parse request body
     const body = await request.json();
-    const { refresh_interval_hours, name, description, signal_instructions } = body;
+    const { refresh_interval_hours, name, description, signal_instructions, risk_criteria } = body;
 
     // Validate refresh_interval_hours if provided
     if (refresh_interval_hours !== undefined) {
@@ -103,6 +103,13 @@ export async function PATCH(
       }
     }
 
+    if (risk_criteria && risk_criteria.length > 2000) {
+      return NextResponse.json(
+        { error: 'Los criterios de riesgo no pueden exceder 2000 caracteres.' },
+        { status: 400 }
+      );
+    }
+
     // Build update object
     const updates: any = {};
 
@@ -110,6 +117,7 @@ export async function PATCH(
     if (name !== undefined) updates.name = name;
     if (description !== undefined) updates.description = description;
     if (signal_instructions !== undefined) updates.signal_instructions = signal_instructions;
+    if (risk_criteria !== undefined) updates.risk_criteria = risk_criteria;
 
     // Update settings JSONB if refresh_interval_hours provided
     if (refresh_interval_hours !== undefined) {
@@ -126,7 +134,7 @@ export async function PATCH(
       .from('projects')
       .update(updates)
       .eq('id', projectId)
-      .select('id, name, description, signal_instructions, settings, created_at, updated_at')
+      .select('id, name, description, signal_instructions, risk_criteria, settings, created_at, updated_at')
       .single();
 
     if (updateError) {

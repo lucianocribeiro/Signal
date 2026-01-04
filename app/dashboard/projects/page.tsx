@@ -17,6 +17,7 @@ interface Project {
   name: string;
   description: string;
   signal_instructions?: string;
+  risk_criteria?: string | null;
   created_at: string;
   updated_at?: string;
   sources?: Source[];

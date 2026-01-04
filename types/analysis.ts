@@ -68,6 +68,9 @@ export interface ProjectAnalysisContext {
   /** AI instructions for signal detection specific to this project */
   signal_instructions: string | null;
 
+  /** User-defined risk criteria for this project */
+  risk_criteria: string | null;
+
   /** Active sources for this project */
   sources: Array<{
     id: string;
@@ -153,6 +156,7 @@ export interface ProjectRow {
   id: string;
   name: string;
   signal_instructions: string | null;
+  risk_criteria?: string | null;
   sources: Array<{
     id: string;
     name: string;
@@ -165,12 +169,17 @@ export interface ProjectRow {
 /**
  * Signal status types (matches database ENUM)
  */
-export type SignalStatus = 'New' | 'Accelerating' | 'Stabilizing' | 'Archived';
+export type SignalStatus = 'New' | 'Accelerating' | 'Stabilizing' | 'Fading' | 'Archived';
 
 /**
  * Signal momentum types (matches database ENUM)
  */
 export type SignalMomentum = 'high' | 'medium' | 'low';
+
+/**
+ * Signal risk level types
+ */
+export type RiskLevel = 'watch_closely' | 'monitor';
 
 /**
  * Detected signal from AI analysis
@@ -180,23 +189,32 @@ export interface DetectedSignal {
   /** Clear, concise headline (max 100 chars) */
   headline: string;
 
-  /** 2-3 sentence summary of the signal */
+  /** Comprehensive multi-paragraph summary of the signal */
   summary: string;
 
-  /** Array of source URLs where this signal was found */
-  sources: string[];
+  /** Key bullet points */
+  key_points: string[];
 
-  /** Array of raw_ingestion IDs that support this signal */
-  raw_ingestion_ids: string[];
+  /** Initial status */
+  status: SignalStatus;
 
-  /** Suggested initial status */
-  suggested_status: SignalStatus;
+  /** Initial momentum level */
+  momentum: SignalMomentum;
 
-  /** Suggested momentum level */
-  suggested_momentum: SignalMomentum;
+  /** Risk level classification */
+  risk_level: RiskLevel;
 
   /** Relevant keywords/tags */
   tags: string[];
+
+  /** Primary source name */
+  source_name?: string;
+
+  /** Primary source URL */
+  source_url?: string;
+
+  /** Array of raw_ingestion IDs that support this signal */
+  raw_ingestion_ids: string[];
 }
 
 /**
@@ -226,11 +244,23 @@ export interface CreatedSignal {
   /** Signal summary */
   summary: string;
 
+  /** Key bullet points */
+  key_points?: string[];
+
   /** Status */
   status: SignalStatus;
 
   /** Momentum */
   momentum: SignalMomentum;
+
+  /** Risk level */
+  risk_level?: RiskLevel;
+
+  /** Source name */
+  source_name?: string | null;
+
+  /** Source URL */
+  source_url?: string | null;
 
   /** Tags */
   tags: string[];
@@ -337,6 +367,9 @@ export interface SignalForMomentumAnalysis {
   /** Current momentum level */
   momentum: SignalMomentum;
 
+  /** Current risk level */
+  risk_level?: RiskLevel;
+
   /** When signal was first detected */
   detected_at: string;
 
@@ -356,6 +389,9 @@ export interface MomentumUpdate {
 
   /** New momentum level */
   new_momentum: 'high' | 'medium' | 'low';
+
+  /** New risk level */
+  new_risk_level: RiskLevel;
 
   /** Reason for the momentum change */
   reason: string;
@@ -399,6 +435,9 @@ export interface UpdatedSignal {
 
   /** New momentum */
   new_momentum: SignalMomentum;
+
+  /** New risk level */
+  new_risk_level?: RiskLevel;
 
   /** Reason for the change */
   reason: string;

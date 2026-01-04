@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
-      .select('id, name, description, signal_instructions, created_at, updated_at')
+      .select('id, name, description, signal_instructions, risk_criteria, created_at, updated_at')
       .eq('owner_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false });
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { name, description, signal_instructions, sources } = body;
+    const { name, description, signal_instructions, risk_criteria, sources } = body;
 
     // Validate required fields
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -195,6 +195,13 @@ export async function POST(request: NextRequest) {
     if (signal_instructions && signal_instructions.length > 2000) {
       return NextResponse.json(
         { error: 'Las instrucciones de señales no pueden exceder 2000 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    if (risk_criteria && risk_criteria.length > 2000) {
+      return NextResponse.json(
+        { error: 'Los criterios de riesgo no pueden exceder 2000 caracteres' },
         { status: 400 }
       );
     }
@@ -239,6 +246,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         description: description?.trim() || null,
         signal_instructions: signal_instructions?.trim() || null,
+        risk_criteria: risk_criteria?.trim() || null,
         is_active: true,
       })
       .select()
@@ -302,6 +310,7 @@ export async function POST(request: NextRequest) {
           name: project.name,
           description: project.description,
           signal_instructions: project.signal_instructions,
+          risk_criteria: project.risk_criteria,
           sources_count: createdSources.length,
         },
       });

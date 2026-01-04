@@ -128,6 +128,7 @@ export async function getProjectAnalysisContext(
       id,
       name,
       signal_instructions,
+      risk_criteria,
       sources!inner (
         id,
         name,
@@ -169,6 +170,7 @@ export async function getProjectAnalysisContext(
     id: data.id,
     name: data.name,
     signal_instructions: data.signal_instructions,
+    risk_criteria: data.risk_criteria ?? null,
     sources: activeSources,
   };
 }
