@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, FolderKanban, AlertCircle, Link2 as LinkIcon } from 'lucide-react';
+import { Plus, Edit2, Trash2, FolderKanban, AlertCircle, AlertTriangle, Link2 as LinkIcon } from 'lucide-react';
 
 interface Source {
   id?: string;
@@ -31,6 +31,7 @@ export default function ProjectsPage() {
     name: '',
     description: '',
     signal_instructions: '',
+    risk_criteria: '',
   });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -66,7 +67,7 @@ export default function ProjectsPage() {
 
   const handleCreateNew = () => {
     setEditingProject(null);
-    setFormData({ name: '', description: '', signal_instructions: '' });
+    setFormData({ name: '', description: '', signal_instructions: '', risk_criteria: '' });
     setError(null);
     setSuccess(null);
     setIsModalOpen(true);
@@ -78,6 +79,7 @@ export default function ProjectsPage() {
       name: project.name,
       description: project.description || '',
       signal_instructions: project.signal_instructions || '',
+      risk_criteria: project.risk_criteria || '',
     });
     setError(null);
     setSuccess(null);
@@ -111,6 +113,7 @@ export default function ProjectsPage() {
             name: formData.name,
             description: formData.description || null,
             signal_instructions: formData.signal_instructions || null,
+            risk_criteria: formData.risk_criteria || null,
           }),
         });
 
@@ -128,7 +131,7 @@ export default function ProjectsPage() {
         // Close modal after short delay
         setTimeout(() => {
           setIsModalOpen(false);
-          setFormData({ name: '', description: '', signal_instructions: '' });
+          setFormData({ name: '', description: '', signal_instructions: '', risk_criteria: '' });
         }, 1000);
       } else {
         // Create new project
@@ -141,6 +144,7 @@ export default function ProjectsPage() {
             name: formData.name,
             description: formData.description || null,
             signal_instructions: formData.signal_instructions || null,
+            risk_criteria: formData.risk_criteria || null,
           }),
         });
 
@@ -158,7 +162,7 @@ export default function ProjectsPage() {
         // Close modal after short delay
         setTimeout(() => {
           setIsModalOpen(false);
-          setFormData({ name: '', description: '', signal_instructions: '' });
+          setFormData({ name: '', description: '', signal_instructions: '', risk_criteria: '' });
         }, 1000);
       }
     } catch (err) {
@@ -360,13 +364,47 @@ export default function ProjectsPage() {
                 </p>
               </div>
 
+              {/* Risk Criteria */}
+              <div>
+                <label htmlFor="risk_criteria" className="block text-sm font-medium text-gray-300 mb-2">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    Criterios de Riesgo Personalizados
+                    <span className="text-xs text-gray-500 font-normal">(Opcional)</span>
+                  </span>
+                </label>
+                <div className="mb-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-2">
+                    <strong className="text-gray-300">Ejemplos:</strong>
+                  </p>
+                  <ul className="text-xs text-gray-500 space-y-1 ml-3">
+                    <li>• "Menciones de corrupción o escándalos legales"</li>
+                    <li>• "Críticas en medios principales (La Nación, Clarín, Infobae)"</li>
+                    <li>• "Contenido viral negativo (+1000 interacciones)"</li>
+                  </ul>
+                </div>
+                <textarea
+                  id="risk_criteria"
+                  value={formData.risk_criteria}
+                  onChange={(e) => setFormData({ ...formData, risk_criteria: e.target.value })}
+                  className="w-full px-4 py-2 bg-black border border-gray-800 rounded-lg text-white focus:outline-none focus:border-red-500/50 transition-colors resize-none"
+                  placeholder="Describe qué situaciones consideras de alto riesgo para este proyecto..."
+                  rows={4}
+                  maxLength={2000}
+                  disabled={submitting}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {formData.risk_criteria.length}/2000 caracteres
+                </p>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setIsModalOpen(false);
-                    setFormData({ name: '', description: '', signal_instructions: '' });
+                    setFormData({ name: '', description: '', signal_instructions: '', risk_criteria: '' });
                     setError(null);
                     setSuccess(null);
                   }}
