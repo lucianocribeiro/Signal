@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Radio, FolderKanban, RefreshCw, Loader2, CheckCircle } from 'lucide-react';
+import { Plus, Radio, FolderKanban, RefreshCw, Loader2, CheckCircle, Info } from 'lucide-react';
 import { useProjects } from '@/contexts/ProjectContext';
 import AddSourceModal from '@/components/AddSourceModal';
 import SourcesList from '@/components/SourcesList';
@@ -27,6 +27,7 @@ export default function SourcesPage() {
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [sourceToDelete, setSourceToDelete] = useState<Source | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -209,6 +210,17 @@ export default function SourcesPage() {
                 <span className="text-sm font-medium">Actualizar</span>
               </button>
 
+              {/* Info Button */}
+              <button
+                onClick={() => setIsInfoOpen((prev) => !prev)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 hover:border-gray-600 transition-colors"
+                aria-expanded={isInfoOpen}
+                aria-controls="url-best-practices"
+              >
+                <Info className="h-4 w-4" />
+                <span className="text-sm font-medium">Info</span>
+              </button>
+
               {/* Add Source Button */}
               <button
                 onClick={() => setIsModalOpen(true)}
@@ -282,7 +294,11 @@ export default function SourcesPage() {
           </div>
         )}
 
-        <UrlBestPracticesInfo />
+        {isInfoOpen && (
+          <div id="url-best-practices">
+            <UrlBestPracticesInfo />
+          </div>
+        )}
 
         {/* Sources List */}
         <div>
