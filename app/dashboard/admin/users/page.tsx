@@ -142,7 +142,7 @@ export default function AdminUsersPage() {
           email: formData.email,
           password: formData.password,
           full_name: formData.full_name,
-          phone_number: formData.phone,
+          phone_number: formData.phone || null,
           role: formData.role,
         }),
       });
@@ -477,7 +477,7 @@ export default function AdminUsersPage() {
                 {/* Phone */}
                 <div>
                   <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
-                    Teléfono
+                    Teléfono <span className="text-xs text-gray-500 font-normal">(Opcional)</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
