@@ -476,23 +476,22 @@ export default function AdminUsersPage() {
 
                 {/* Phone */}
                 <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-300 mb-2">
-                    Teléfono <span className="text-xs text-gray-500 font-normal">(Opcional)</span>
+                  <label htmlFor="phone_number" className="block text-sm font-medium mb-1">
+                    Teléfono (Opcional)
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Phone className="h-5 w-5 text-gray-500" />
-                    </div>
-                    <input
-                      id="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      disabled={isCreating}
-                      className="block w-full pl-10 pr-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-signal-500 focus:border-transparent transition-all disabled:opacity-50"
-                      placeholder="+54 11 1234-5678"
-                    />
-                  </div>
+                  <input
+                    id="phone_number"
+                    name="phone_number"
+                    type="tel"
+                    placeholder="+54 11 1234-5678"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    disabled={isCreating}
+                    className="w-full px-3 py-2 border rounded-md"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Para recibir notificaciones por SMS
+                  </p>
                 </div>
 
                 {/* Role Selector */}
