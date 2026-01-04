@@ -10,6 +10,7 @@ interface DeleteSourceConfirmModalProps {
     id: string;
     url: string;
     name: string | null;
+    is_active: boolean;
   } | null;
   onConfirmDelete: (sourceId: string) => Promise<void>;
 }
@@ -59,7 +60,9 @@ export default function DeleteSourceConfirmModal({
             <div className="h-10 w-10 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
               <AlertTriangle className="h-5 w-5 text-red-400" />
             </div>
-            <h2 className="text-xl font-bold text-white">¿Eliminar fuente?</h2>
+            <h2 className="text-xl font-bold text-white">
+              {source.is_active ? '¿Desactivar fuente?' : '¿Eliminar fuente?'}
+            </h2>
           </div>
           <button
             onClick={handleClose}
@@ -73,12 +76,17 @@ export default function DeleteSourceConfirmModal({
         {/* Content */}
         <div className="p-6 space-y-4">
           <p className="text-gray-300">
-            ¿Estás seguro de que deseas eliminar esta fuente? Esta acción no se puede deshacer.
+            {source.is_active
+              ? '¿Estás seguro de que deseas desactivar esta fuente? Dejará de ser monitoreada pero podrás reactivarla más tarde.'
+              : '¿Estás seguro de que deseas eliminar esta fuente inactiva? Esta acción marcará la fuente como eliminada.'
+            }
           </p>
 
           {/* Source Info */}
           <div className="bg-black border border-gray-800 rounded-lg p-4">
-            <p className="text-sm text-gray-500 mb-1">Fuente a eliminar:</p>
+            <p className="text-sm text-gray-500 mb-1">
+              {source.is_active ? 'Fuente a desactivar:' : 'Fuente a eliminar:'}
+            </p>
             {source.name && (
               <p className="text-base font-semibold text-gray-200 mb-1">
                 {source.name}
@@ -97,9 +105,16 @@ export default function DeleteSourceConfirmModal({
           )}
 
           {/* Warning Note */}
-          <div className="bg-orange-950/20 border border-orange-900/30 rounded-lg p-4">
-            <p className="text-sm text-orange-300">
-              <strong>Nota:</strong> Esta fuente dejará de ser monitoreada y no se generarán más señales desde ella.
+          <div className={`rounded-lg p-4 ${
+            source.is_active
+              ? 'bg-orange-950/20 border border-orange-900/30'
+              : 'bg-red-950/20 border border-red-900/30'
+          }`}>
+            <p className={`text-sm ${source.is_active ? 'text-orange-300' : 'text-red-300'}`}>
+              <strong>Nota:</strong> {source.is_active
+                ? 'Esta fuente dejará de ser monitoreada y no se generarán más señales desde ella.'
+                : 'Esta fuente ya está inactiva. Al eliminarla, se marcará como eliminada permanentemente.'
+              }
             </p>
           </div>
         </div>
@@ -128,7 +143,7 @@ export default function DeleteSourceConfirmModal({
             ) : (
               <>
                 <Trash2 className="h-4 w-4" />
-                <span>Eliminar</span>
+                <span>{source.is_active ? 'Desactivar' : 'Eliminar'}</span>
               </>
             )}
           </button>

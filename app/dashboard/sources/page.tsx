@@ -24,6 +24,7 @@ interface Source {
 export default function SourcesPage() {
   const { currentProject, projects, isLoading: projectsLoading } = useProjects();
   const [sources, setSources] = useState<Source[]>([]);
+  const [showInactive, setShowInactive] = useState(true);
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -31,6 +32,11 @@ export default function SourcesPage() {
   const [sourceToDelete, setSourceToDelete] = useState<Source | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Filter sources based on showInactive toggle
+  const filteredSources = showInactive
+    ? sources
+    : sources.filter(s => s.is_active);
 
   // Fetch sources for current project
   const fetchSources = async () => {
@@ -304,12 +310,25 @@ export default function SourcesPage() {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-300">
-              Fuentes del Proyecto ({sources.length})
+              Fuentes del Proyecto ({filteredSources.length})
             </h2>
+
+            {/* Show Inactive Toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-700 bg-gray-900 text-signal-500 focus:ring-signal-500 focus:ring-offset-0"
+              />
+              <span className="text-sm text-gray-400">
+                Mostrar inactivas ({sources.filter(s => !s.is_active).length})
+              </span>
+            </label>
           </div>
 
           <SourcesList
-            sources={sources}
+            sources={filteredSources}
             isLoading={isLoadingSources}
             onDeleteClick={handleDeleteClick}
           />

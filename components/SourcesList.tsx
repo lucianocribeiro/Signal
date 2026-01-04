@@ -170,12 +170,16 @@ export default function SourcesList({ sources, isLoading, onDeleteClick }: Sourc
                   </div>
 
                   {/* Delete Button */}
-                  {onDeleteClick && source.is_active && (
+                  {onDeleteClick && (
                     <button
                       onClick={() => onDeleteClick(source)}
-                      className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors"
-                      title="Eliminar fuente"
-                      aria-label="Eliminar fuente"
+                      className={`p-2 rounded-lg transition-colors ${
+                        source.is_active
+                          ? 'text-gray-400 hover:text-red-400 hover:bg-red-950/20'
+                          : 'text-gray-600 hover:text-red-500 hover:bg-red-950/30'
+                      }`}
+                      title={source.is_active ? 'Desactivar fuente' : 'Eliminar fuente inactiva'}
+                      aria-label={source.is_active ? 'Desactivar fuente' : 'Eliminar fuente inactiva'}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
