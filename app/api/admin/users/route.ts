@@ -61,9 +61,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    if (role !== 'user' && role !== 'admin' && role !== 'viewer' && role !== 'owner') {
+    if (role !== 'user' && role !== 'admin' && role !== 'viewer') {
       return NextResponse.json(
-        { error: 'Rol inválido. Debe ser "user", "admin", "viewer" u "owner"' },
+        { error: 'Rol inválido. Debe ser "user", "admin" o "viewer"' },
         { status: 400 }
       );
     }
@@ -239,7 +239,7 @@ export async function PATCH(request: NextRequest) {
     const profileUpdates: any = {};
 
     if (updates.role !== undefined) {
-      if (updates.role !== 'user' && updates.role !== 'admin' && updates.role !== 'viewer' && updates.role !== 'owner') {
+      if (updates.role !== 'user' && updates.role !== 'admin' && updates.role !== 'viewer') {
         return NextResponse.json(
           { error: 'Rol inválido' },
           { status: 400 }

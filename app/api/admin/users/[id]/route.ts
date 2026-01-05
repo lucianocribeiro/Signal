@@ -107,9 +107,9 @@ export async function PATCH(
     const { role, full_name, phone_number } = body;
 
     // Validate role if provided
-    if (role !== undefined && !['user', 'admin', 'viewer', 'owner'].includes(role)) {
+    if (role !== undefined && !['user', 'admin', 'viewer'].includes(role)) {
       return NextResponse.json(
-        { error: 'El rol debe ser "user", "admin", "viewer" u "owner".' },
+        { error: 'El rol debe ser "user", "admin" o "viewer".' },
         { status: 400 }
       );
     }
@@ -299,76 +299,6 @@ export async function DELETE(
     );
   } catch (error) {
     console.error('Unexpected error in DELETE /api/admin/users/[id]:', error);
-    return NextResponse.json(
-      { error: 'Error interno del servidor.' },
-      { status: 500 }
-    );
-  }
-}
-
-// POST /api/admin/users/[id] - Reset user password
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { authorized, response, user } = await verifyAdminRole();
-    if (!authorized || !user) {
-      return response!;
-    }
-
-    const userId = params.id;
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'ID de usuario requerido.' },
-        { status: 400 }
-      );
-    }
-
-    const body = await request.json();
-    const { password } = body;
-
-    if (!password || typeof password !== 'string') {
-      return NextResponse.json(
-        { error: 'La nueva contraseña es requerida.' },
-        { status: 400 }
-      );
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'La contraseña debe tener al menos 8 caracteres.' },
-        { status: 400 }
-      );
-    }
-
-    const { error: resetError } = await supabaseAdmin.auth.admin.updateUserById(
-      userId,
-      { password }
-    );
-
-    if (resetError) {
-      console.error('Error resetting password:', resetError);
-      return NextResponse.json(
-        { error: 'Error al restablecer la contraseña.' },
-        { status: 500 }
-      );
-    }
-
-    await logAuditAction(user.id, 'USER_PASSWORD_RESET', userId, {
-      reset_by: user.id,
-      reset_at: new Date().toISOString(),
-    });
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Contraseña restablecida correctamente.',
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('Unexpected error in POST /api/admin/users/[id]:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor.' },
       { status: 500 }
