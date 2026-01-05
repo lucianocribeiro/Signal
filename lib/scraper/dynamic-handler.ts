@@ -3,7 +3,7 @@
  * Handles waiting for dynamic content, scrolling, and platform-specific extraction
  */
 
-import { Page } from 'puppeteer';
+import { Page } from 'puppeteer-core';
 import { PlatformConfig } from './types';
 import { cleanText, delay } from './utils';
 
