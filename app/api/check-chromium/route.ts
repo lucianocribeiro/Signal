@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import chromium from '@sparticuz/chromium';
+import chromium from '@sparticuz/chromium-min';
 import { existsSync } from 'fs';
 
 export const dynamic = 'force-dynamic';

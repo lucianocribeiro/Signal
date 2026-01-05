@@ -1,6 +1,5 @@
-import puppeteer, { Page } from 'puppeteer';
-import puppeteerCore from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import puppeteer, { Page } from 'puppeteer-core';
+import chromium from '@sparticuz/chromium-min';
 import { ScraperResult, ScraperOptions, ScrapedContent } from './types';
 import { cleanText, extractDomain } from './utils';
 import { detectPlatform, getPlatformConfig } from './platforms';
@@ -131,55 +130,46 @@ export async function scrapeUrl(
     console.log(`[Scraper] Using Puppeteer for: ${url}`);
 
     // Detect environment: production (Vercel) or local development
-    const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
+    const isProduction = process.env.NODE_ENV === 'production';
 
-    // Launch browser with appropriate configuration
+    // Launch browser with proven configuration
     try {
-      if (isProduction) {
-        console.log('[SCRAPER] Chromium will auto-download to /tmp...');
-      }
-
-      const executablePath = isProduction
-        ? await chromium.executablePath()
-        : puppeteer.executablePath();
-
-      console.log('[SCRAPER] Executable path resolved:', executablePath);
-      console.log('[SCRAPER] Launching browser with executable:', executablePath);
+      console.log('[SCRAPER] Environment:', process.env.NODE_ENV);
+      console.log('[SCRAPER] Starting Puppeteer launch...');
 
       if (isProduction) {
-        // Vercel production: use puppeteer-core with full @sparticuz/chromium
-        browser = await puppeteerCore.launch({
+        // Vercel production - proven working config
+        browser = await puppeteer.launch({
           args: [
             ...chromium.args,
-            '--disable-gpu',
-            '--disable-dev-shm-usage',
-            '--disable-setuid-sandbox',
             '--no-sandbox',
-            '--single-process', // Critical for Vercel serverless
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
             '--no-zygote',
+            '--single-process',
+            '--disable-gpu',
           ],
           defaultViewport: chromium.defaultViewport,
-          executablePath,
+          executablePath: await chromium.executablePath(
+            'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar'
+          ),
           headless: chromium.headless,
           ignoreHTTPSErrors: true,
         }) as any;
       } else {
-        // Local development: use standard puppeteer
+        // Local development
         browser = await puppeteer.launch({
-          headless: config.headless,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-          ],
+          headless: true,
+          args: ['--no-sandbox'],
         });
       }
 
       console.log('[SCRAPER] ✅ Browser launched successfully');
     } catch (launchError) {
       const message = launchError instanceof Error ? launchError.message : String(launchError);
-      console.error('[SCRAPER] ❌ Failed to launch browser:', launchError);
+      console.error('[SCRAPER] ❌ Launch failed:', launchError);
       throw new Error(`Browser launch failed: ${message}`);
     }
 

@@ -10,15 +10,7 @@
     }
   ],
   "functions": {
-    "app/api/cron/scrape/route.ts": {
-      "memory": 3008,
-      "maxDuration": 300
-    },
-    "app/api/cron/analyze/route.ts": {
-      "memory": 1024,
-      "maxDuration": 300
-    },
-    "app/api/projects/*/scrape/route.ts": {
+    "app/api/**/*.ts": {
       "memory": 3008,
       "maxDuration": 300
     }
