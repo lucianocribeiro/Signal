@@ -156,8 +156,7 @@ export async function scrapeUrl(
             'https://github.com/Sparticuz/chromium/releases/download/v131.0.0/chromium-v131.0.0-pack.tar'
           ),
           headless: chromium.headless,
-          ignoreHTTPSErrors: true,
-        }) as any;
+        });
       } else {
         // Local development
         browser = await puppeteer.launch({
