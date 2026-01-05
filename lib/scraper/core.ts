@@ -135,10 +135,15 @@ export async function scrapeUrl(
 
     // Launch browser with appropriate configuration
     try {
+      if (isProduction) {
+        console.log('[SCRAPER] Chromium will auto-download to /tmp...');
+      }
+
       const executablePath = isProduction
-        ? await chromium.executablePath('/tmp/chromium')
+        ? await chromium.executablePath()
         : puppeteer.executablePath();
 
+      console.log('[SCRAPER] Executable path resolved:', executablePath);
       console.log('[SCRAPER] Launching browser with executable:', executablePath);
 
       if (isProduction) {
