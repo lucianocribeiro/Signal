@@ -202,9 +202,10 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    console.log('[Project API DELETE] === Request started ===');
+  const { id: projectId } = params;
+  console.log('[Project API DELETE] Starting delete for project:', projectId);
 
+  try {
     const supabase = await createServerClient();
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -215,14 +216,13 @@ export async function DELETE(
 
     console.log('[Project API DELETE] User authenticated:', user.id);
 
-    const { id: projectId } = params;
-    console.log('[Project API DELETE] Deleting project:', projectId);
-
     const { data: profile } = await supabase
       .from('user_profiles')
       .select('role')
       .eq('id', user.id)
       .single();
+
+    console.log('[Project API DELETE] User role:', profile?.role);
 
     // Verify ownership and delete
     const deleteQuery = supabase
@@ -231,17 +231,32 @@ export async function DELETE(
       .eq('id', projectId);
 
     if (profile?.role !== 'admin') {
+      console.log('[Project API DELETE] Non-admin user, checking ownership');
       deleteQuery.eq('owner_id', user.id);
     }
 
-    const { error: deleteError } = await deleteQuery;
+    console.log('[Project API DELETE] Executing delete query...');
+    const { data: deletedData, error: deleteError } = await deleteQuery.select();
 
     if (deleteError) {
       console.error('[Project API DELETE] Error deleting project:', deleteError);
-      return NextResponse.json({ error: 'Error al eliminar proyecto' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Error al eliminar proyecto: ' + deleteError.message },
+        { status: 500 }
+      );
     }
 
-    console.log('[Project API DELETE] Project deleted successfully');
+    console.log('[Project API DELETE] Delete result:', deletedData);
+
+    if (!deletedData || deletedData.length === 0) {
+      console.error('[Project API DELETE] No rows deleted - project not found or access denied');
+      return NextResponse.json(
+        { error: 'Proyecto no encontrado o sin permisos' },
+        { status: 404 }
+      );
+    }
+
+    console.log('[Project API DELETE] ✅ Project deleted successfully');
 
     // Log the action
     const supabaseService = createServiceClient();
@@ -256,9 +271,10 @@ export async function DELETE(
       console.warn('[Project API DELETE] Failed to log to audit_logs:', auditError);
     }
 
-    console.log('[Project API DELETE] === Request completed successfully ===');
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      message: 'Proyecto eliminado correctamente',
+    });
   } catch (error) {
     console.error('[Project API DELETE] Unexpected error:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
