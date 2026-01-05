@@ -87,12 +87,47 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = async (projectId: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar este proyecto?')) {
+    const project = projects.find(p => p.id === projectId);
+    const projectName = project?.name || 'este proyecto';
+
+    console.log('[Projects Page] Attempting to delete project:', projectId);
+
+    if (!confirm(`¿Estás seguro de eliminar el proyecto "${projectName}"? Esta acción no se puede deshacer.`)) {
+      console.log('[Projects Page] Delete cancelled by user');
       return;
     }
 
-    // TODO: Implement DELETE endpoint
-    console.log('Delete project:', projectId);
+    try {
+      console.log('[Projects Page] Sending DELETE request...');
+      setError(null);
+      setSuccess(null);
+
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+
+      console.log('[Projects Page] Response status:', response.status);
+      const result = await response.json();
+      console.log('[Projects Page] Response data:', result);
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al eliminar proyecto');
+      }
+
+      console.log('[Projects Page] Delete successful, refreshing list...');
+      setSuccess(`Proyecto "${projectName}" eliminado correctamente`);
+
+      // Refresh projects list
+      await fetchProjects();
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess(null);
+      }, 3000);
+    } catch (err) {
+      console.error('[Projects Page] Delete failed:', err);
+      setError(err instanceof Error ? err.message : 'Error al eliminar proyecto');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

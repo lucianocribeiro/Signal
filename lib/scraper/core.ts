@@ -1,6 +1,6 @@
 import puppeteer, { Page } from 'puppeteer';
 import puppeteerCore from 'puppeteer-core';
-import chromium from '@sparticuz/chromium-min';
+import chromium from '@sparticuz/chromium';
 import { ScraperResult, ScraperOptions, ScrapedContent } from './types';
 import { cleanText, extractDomain } from './utils';
 import { detectPlatform, getPlatformConfig } from './platforms';
@@ -134,41 +134,46 @@ export async function scrapeUrl(
     const isProduction = process.env.VERCEL || process.env.NODE_ENV === 'production';
 
     // Launch browser with appropriate configuration
-    if (isProduction) {
-      // Vercel production: use puppeteer-core with @sparticuz/chromium-min
-      // Downloads binary to /tmp at runtime (avoids 50MB bundle limit)
-      const execPath = await chromium.executablePath(
-        'https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar'
-      );
-      console.log('[Scraper] Chromium executable path:', execPath);
+    try {
+      const executablePath = isProduction
+        ? await chromium.executablePath()
+        : puppeteer.executablePath();
 
-      browser = await puppeteerCore.launch({
-        args: [
-          ...chromium.args,
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-          '--disable-setuid-sandbox',
-          '--no-sandbox',
-          '--single-process', // Critical for Vercel serverless
-        ],
-        executablePath: execPath,
-        headless: chromium.headless,
-        defaultViewport: { width: 1920, height: 1080 },
-      }) as any;
+      console.log('[SCRAPER] Launching browser with executable:', executablePath);
 
-      console.log('[Scraper] Browser launched successfully');
-    } else {
-      // Local development: use standard puppeteer
-      browser = await puppeteer.launch({
-        headless: config.headless,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-        ],
-      });
-      console.log('[Scraper] Using standard puppeteer for local development');
+      if (isProduction) {
+        // Vercel production: use puppeteer-core with full @sparticuz/chromium
+        browser = await puppeteerCore.launch({
+          args: [
+            ...chromium.args,
+            '--disable-gpu',
+            '--disable-dev-shm-usage',
+            '--disable-setuid-sandbox',
+            '--no-sandbox',
+            '--single-process', // Critical for Vercel serverless
+          ],
+          defaultViewport: chromium.defaultViewport,
+          executablePath,
+          headless: chromium.headless,
+        }) as any;
+      } else {
+        // Local development: use standard puppeteer
+        browser = await puppeteer.launch({
+          headless: config.headless,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+          ],
+        });
+      }
+
+      console.log('[SCRAPER] ✅ Browser launched successfully');
+    } catch (launchError) {
+      const message = launchError instanceof Error ? launchError.message : String(launchError);
+      console.error('[SCRAPER] ❌ Failed to launch browser:', launchError);
+      throw new Error(`Browser launch failed: ${message}`);
     }
 
     // Create new page
