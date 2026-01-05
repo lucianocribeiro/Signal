@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { email, password, full_name, phone, role } = body;
+    const { email, password, full_name, phone, phone_number, role } = body;
+    const normalizedPhone = phone_number ?? phone ?? null;
 
     // Validate required fields
     if (!email || !password) {
@@ -59,6 +60,13 @@ export async function POST(request: NextRequest) {
     if (password.length < 8) {
       return NextResponse.json(
         { error: 'La contraseña debe tener al menos 8 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    if (role && !['admin', 'user', 'viewer'].includes(role)) {
+      return NextResponse.json(
+        { error: 'El rol debe ser "admin", "user" o "viewer".' },
         { status: 400 }
       );
     }
@@ -93,7 +101,7 @@ export async function POST(request: NextRequest) {
       id: authData.user.id,
       email,
       full_name: full_name || null,
-      phone: phone || null,
+      phone_number: normalizedPhone,
       role: role || 'user',
       is_active: true,
     });

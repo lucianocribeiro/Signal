@@ -39,6 +39,12 @@ export async function GET(request: NextRequest) {
 
     console.log('[Signals API GET] User authenticated:', user.id);
 
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('project_id');
@@ -51,17 +57,31 @@ export async function GET(request: NextRequest) {
 
     console.log('[Signals API GET] Fetching signals for project:', projectId, 'status:', status || 'all');
 
-    // Verify user owns this project
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('owner_id', user.id)
-      .single();
+    if (profile?.role === 'viewer') {
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('project_viewer_assignments')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('viewer_id', user.id)
+        .maybeSingle();
 
-    if (projectError || !project) {
-      console.error('[Signals API GET] Project not found or access denied:', projectError);
-      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
+      if (assignmentError || !assignment) {
+        console.error('[Signals API GET] Viewer access denied:', assignmentError);
+        return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+      }
+    } else if (profile?.role !== 'admin') {
+      // Verify user owns this project
+      const { data: project, error: projectError } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('id', projectId)
+        .eq('owner_id', user.id)
+        .single();
+
+      if (projectError || !project) {
+        console.error('[Signals API GET] Project not found or access denied:', projectError);
+        return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
+      }
     }
 
     // Build query
@@ -177,6 +197,12 @@ export async function PATCH(request: NextRequest) {
 
     console.log('[Signals API PATCH] User authenticated:', user.id);
 
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     // Parse request body
     const body = await request.json();
     const { signal_id, status } = body;
@@ -202,12 +228,20 @@ export async function PATCH(request: NextRequest) {
         )
       `)
       .eq('id', signal_id)
-      .eq('projects.owner_id', user.id)
       .single();
 
     if (signalError || !signal) {
       console.error('[Signals API PATCH] Signal not found or access denied:', signalError);
       return NextResponse.json({ error: 'Señal no encontrada' }, { status: 404 });
+    }
+
+    if (profile?.role === 'viewer') {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+    }
+
+    const ownerId = (signal.projects as any).owner_id;
+    if (profile?.role !== 'admin' && ownerId !== user.id) {
+      return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
 
     // Update the signal

@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
     const { data: projects, error: projectsError } = await supabase
       .from('projects')
       .select('id, name, description, signal_instructions, risk_criteria, created_at, updated_at')
-      .eq('owner_id', user.id)
       .eq('is_active', true)
       .order('created_at', { ascending: false });
 

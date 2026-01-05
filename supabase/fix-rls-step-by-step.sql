@@ -1,40 +1,37 @@
 /* Step 1: Drop the problematic policy */
 DROP POLICY IF EXISTS "Admins can view all profiles" ON user_profiles;
 
-/* Step 2: Add 'owner' to the user_role enum */
-ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'owner';
-
-/* Step 3: Create security definer function to check owner role */
-CREATE OR REPLACE FUNCTION is_owner()
+/* Step 2: Create security definer function to check admin role */
+CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM user_profiles
-    WHERE id = auth.uid() AND role = 'owner'
+    WHERE id = auth.uid() AND role = 'admin'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-/* Step 4: Create new owner policies */
-CREATE POLICY "Owners can view all profiles"
+/* Step 3: Create new admin policies */
+CREATE POLICY "Admins can view all profiles"
     ON user_profiles FOR SELECT
-    USING (is_owner());
+    USING (is_admin());
 
-CREATE POLICY "Owners can update all profiles"
+CREATE POLICY "Admins can update all profiles"
     ON user_profiles FOR UPDATE
-    USING (is_owner());
+    USING (is_admin());
 
-CREATE POLICY "Owners can insert profiles"
+CREATE POLICY "Admins can insert profiles"
     ON user_profiles FOR INSERT
-    WITH CHECK (is_owner());
+    WITH CHECK (is_admin());
 
-CREATE POLICY "Owners can delete profiles"
+CREATE POLICY "Admins can delete profiles"
     ON user_profiles FOR DELETE
-    USING (is_owner());
+    USING (is_admin());
 
 /* Step 5: Fix audit logs policy */
 DROP POLICY IF EXISTS "Admins can view all audit logs" ON audit_logs;
 
-CREATE POLICY "Owners can view all audit logs"
+CREATE POLICY "Admins can view all audit logs"
     ON audit_logs FOR SELECT
-    USING (is_owner());
+    USING (is_admin());

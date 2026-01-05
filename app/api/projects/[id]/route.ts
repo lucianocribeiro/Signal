@@ -38,7 +38,6 @@ export async function GET(
       .from('projects')
       .select('*')
       .eq('id', projectId)
-      .eq('owner_id', user.id)
       .single();
 
     if (projectError || !project) {
@@ -74,15 +73,27 @@ export async function PATCH(
       return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     // Check project ownership
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id, name, owner_id, settings')
       .eq('id', projectId)
-      .eq('owner_id', user.id)
       .single();
 
     if (projectError || !project) {
+      return NextResponse.json(
+        { error: 'Proyecto no encontrado o acceso denegado' },
+        { status: 404 }
+      );
+    }
+
+    if (profile?.role !== 'admin' && project.owner_id !== user.id) {
       return NextResponse.json(
         { error: 'Proyecto no encontrado o acceso denegado' },
         { status: 404 }
@@ -207,12 +218,23 @@ export async function DELETE(
     const { id: projectId } = params;
     console.log('[Project API DELETE] Deleting project:', projectId);
 
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     // Verify ownership and delete
-    const { error: deleteError } = await supabase
+    const deleteQuery = supabase
       .from('projects')
       .delete()
-      .eq('id', projectId)
-      .eq('owner_id', user.id);
+      .eq('id', projectId);
+
+    if (profile?.role !== 'admin') {
+      deleteQuery.eq('owner_id', user.id);
+    }
+
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('[Project API DELETE] Error deleting project:', deleteError);

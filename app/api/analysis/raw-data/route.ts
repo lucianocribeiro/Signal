@@ -44,6 +44,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     // Step 2: Parse and validate query parameters
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
@@ -92,7 +98,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify ownership
-    if (project.owner_id !== user.id) {
+    if (project.owner_id !== user.id && profile?.role !== 'admin') {
       return NextResponse.json(
         { success: false, error: 'No tienes permisos para acceder a este proyecto' },
         { status: 403 }

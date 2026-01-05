@@ -24,6 +24,56 @@ export default function DashboardLayout({
   const [isMounted, setIsMounted] = useState(false);
   const SIDEBAR_COLLAPSED_KEY = 'signal_sidebar_collapsed';
 
+  const userRole = profile?.role;
+  const navigation = [
+    {
+      name: 'Tablero',
+      href: '/dashboard',
+      icon: LayoutDashboard,
+      roles: ['admin', 'user', 'viewer'],
+    },
+    {
+      name: 'Proyectos',
+      href: '/dashboard/projects',
+      icon: FolderKanban,
+      roles: ['admin', 'user'],
+    },
+    {
+      name: 'Fuentes',
+      href: '/dashboard/sources',
+      icon: Radio,
+      roles: ['admin', 'user'],
+    },
+    {
+      name: 'Configuración',
+      href: '/dashboard/settings',
+      icon: Settings,
+      roles: ['admin', 'user'],
+    },
+    {
+      name: 'Usuarios',
+      href: '/dashboard/admin/users',
+      icon: Users,
+      roles: ['admin'],
+    },
+    {
+      name: 'Observadores',
+      href: '/dashboard/admin/viewer-assignments',
+      icon: Users,
+      roles: ['admin'],
+    },
+    {
+      name: 'Debug',
+      href: '/dashboard/admin/debug',
+      icon: Bug,
+      roles: ['admin'],
+    },
+  ];
+
+  const filteredNavigation = userRole
+    ? navigation.filter((item) => item.roles.includes(userRole))
+    : [];
+
   const isActive = (path: string) => {
     if (path === '/dashboard') {
       return pathname === '/dashboard';
@@ -98,89 +148,21 @@ export default function DashboardLayout({
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
-            <Link
-              href="/dashboard"
-              className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                isActive('/dashboard')
-                  ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-              }`}
-              title={isSidebarCollapsed ? 'Tablero' : undefined}
-            >
-              <LayoutDashboard className="h-5 w-5 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>Tablero</span>}
-            </Link>
-
-            <Link
-              href="/dashboard/sources"
-              className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                isActive('/dashboard/sources')
-                  ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-              }`}
-              title={isSidebarCollapsed ? 'Fuentes' : undefined}
-            >
-              <Radio className="h-5 w-5 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>Fuentes</span>}
-            </Link>
-
-            <Link
-              href="/dashboard/projects"
-              className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                isActive('/dashboard/projects')
-                  ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-              }`}
-              title={isSidebarCollapsed ? 'Proyectos' : undefined}
-            >
-              <FolderKanban className="h-5 w-5 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>Proyectos</span>}
-            </Link>
-
-            {/* Admin Users Link - Only visible to admins */}
-            {profile?.role === 'admin' && (
+            {filteredNavigation.map((item) => (
               <Link
-                href="/dashboard/admin/users"
+                key={item.href}
+                href={item.href}
                 className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                  isActive('/dashboard/admin/users')
+                  isActive(item.href)
                     ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
                     : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
                 }`}
-                title={isSidebarCollapsed ? 'Usuarios' : undefined}
+                title={isSidebarCollapsed ? item.name : undefined}
               >
-                <Users className="h-5 w-5 flex-shrink-0" />
-                {!isSidebarCollapsed && <span>Usuarios</span>}
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && <span>{item.name}</span>}
               </Link>
-            )}
-
-            {/* Admin Debug Link - Only visible to admins */}
-            {profile?.role === 'admin' && (
-              <Link
-                href="/dashboard/admin/debug"
-                className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                  isActive('/dashboard/admin/debug')
-                    ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-                }`}
-                title={isSidebarCollapsed ? 'Debug' : undefined}
-              >
-                <Bug className="h-5 w-5 flex-shrink-0" />
-                {!isSidebarCollapsed && <span>Debug</span>}
-              </Link>
-            )}
-
-            <Link
-              href="/dashboard/settings"
-              className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                isActive('/dashboard/settings')
-                  ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-              }`}
-              title={isSidebarCollapsed ? 'Configuración' : undefined}
-            >
-              <Settings className="h-5 w-5 flex-shrink-0" />
-              {!isSidebarCollapsed && <span>Configuración</span>}
-            </Link>
+            ))}
           </nav>
 
           {/* Footer - User Profile + Agency Logo */}

@@ -50,6 +50,12 @@ export async function GET(
 
     const { signalId } = params;
 
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
     // Verify the signal exists and user has access
     const { data: signal, error: signalError } = await supabase
       .from('signals')
@@ -69,12 +75,29 @@ export async function GET(
       `
       )
       .eq('id', signalId)
-      .eq('projects.owner_id', user.id)
       .single();
 
     if (signalError || !signal) {
       console.error('[Signal Evidence API] Signal not found or access denied:', signalError);
       return NextResponse.json({ error: 'Señal no encontrada' }, { status: 404 });
+    }
+
+    if (profile?.role === 'viewer') {
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('project_viewer_assignments')
+        .select('id')
+        .eq('project_id', signal.project_id)
+        .eq('viewer_id', user.id)
+        .maybeSingle();
+
+      if (assignmentError || !assignment) {
+        return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+      }
+    } else if (profile?.role !== 'admin') {
+      const ownerId = (signal.projects as any).owner_id;
+      if (ownerId !== user.id) {
+        return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
+      }
     }
 
     console.log('[Signal Evidence API] Signal found:', signal.headline);

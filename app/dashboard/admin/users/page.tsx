@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, X, User as UserIcon, Mail, Lock, Phone, Calendar, Shield, Loader2, Check, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, X, User as UserIcon, Mail, Lock, Calendar, Shield, Loader2, Check, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -9,10 +9,11 @@ interface UserProfile {
   id: string;
   email: string;
   full_name: string | null;
-  phone: string | null;
+  phone_number: string | null;
   role: 'admin' | 'user' | 'viewer';
   created_at: string;
   updated_at: string;
+  is_active: boolean;
 }
 
 export default function AdminUsersPage() {
@@ -40,13 +41,19 @@ export default function AdminUsersPage() {
     password: '',
   });
 
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetUser, setResetUser] = useState<UserProfile | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
   // Fetch users from database
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select('id, email, full_name, phone_number, role, created_at, updated_at, is_active')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -63,6 +70,32 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const getRoleLabel = (role: UserProfile['role']) => {
+    switch (role) {
+      case 'admin':
+        return 'Administrador';
+      case 'user':
+        return 'Usuario';
+      case 'viewer':
+        return 'Observador';
+      default:
+        return role;
+    }
+  };
+
+  const getRoleBadgeClasses = (role: UserProfile['role']) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-signal-500/10 text-signal-500 border border-signal-500/20';
+      case 'viewer':
+        return 'bg-gray-800 text-gray-400 border border-gray-700';
+      case 'user':
+        return 'bg-gray-800 text-gray-400 border border-gray-700';
+      default:
+        return 'bg-gray-800 text-gray-400 border border-gray-700';
+    }
+  };
 
   // Validate email format
   const validateEmail = (email: string): boolean => {
@@ -210,6 +243,53 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleOpenResetModal = (userToReset: UserProfile) => {
+    setResetUser(userToReset);
+    setResetPassword('');
+    setResetError(null);
+    setIsResetModalOpen(true);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetUser) return;
+
+    setResetError(null);
+
+    const passwordValidation = validatePassword(resetPassword);
+    if (!passwordValidation.isValid) {
+      setResetError(passwordValidation.error);
+      return;
+    }
+
+    setIsResetting(true);
+
+    try {
+      const response = await fetch(`/api/admin/users/${resetUser.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ password: resetPassword }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al restablecer la contraseña');
+      }
+
+      setSuccess(`Contraseña restablecida para ${resetUser.email}`);
+      setIsResetModalOpen(false);
+      setResetUser(null);
+      setResetPassword('');
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Error al restablecer la contraseña');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   // Format date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-AR', {
@@ -314,19 +394,17 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      {user.role === 'admin' ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-signal-500/10 text-signal-500 border border-signal-500/20">
-                          <Shield className="h-3 w-3 mr-1" />
-                          Administrador
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-400 border border-gray-700">
-                          Usuario
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeClasses(
+                          user.role
+                        )}`}
+                      >
+                        {user.role === 'admin' && <Shield className="h-3 w-3 mr-1" />}
+                        {getRoleLabel(user.role)}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm text-gray-400">{user.phone || '—'}</p>
+                      <p className="text-sm text-gray-400">{user.phone_number || '—'}</p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-sm text-gray-400">
@@ -335,13 +413,22 @@ export default function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleDeleteUser(user.id, user.email)}
-                        className="flex items-center gap-2 px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/20 rounded-lg transition-colors text-sm border border-transparent hover:border-red-900/30"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Eliminar
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleOpenResetModal(user)}
+                          className="flex items-center gap-2 px-3 py-1.5 text-signal-400 hover:text-signal-300 hover:bg-signal-500/10 rounded-lg transition-colors text-sm border border-transparent hover:border-signal-500/30"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Resetear
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id, user.email)}
+                          className="flex items-center gap-2 px-3 py-1.5 text-red-400 hover:text-red-300 hover:bg-red-950/20 rounded-lg transition-colors text-sm border border-transparent hover:border-red-900/30"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Eliminar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -504,22 +591,6 @@ export default function AdminUsersPage() {
                       <input
                         type="radio"
                         name="role"
-                        value="user"
-                        checked={formData.role === 'user'}
-                        onChange={(e) => handleInputChange('role', e.target.value)}
-                        disabled={isCreating}
-                        className="h-4 w-4 text-signal-500 focus:ring-signal-500 border-gray-600"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-white">Usuario</p>
-                        <p className="text-xs text-gray-500">Acceso estándar a la plataforma</p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-700 rounded-lg cursor-pointer hover:border-gray-600 transition-colors">
-                      <input
-                        type="radio"
-                        name="role"
                         value="admin"
                         checked={formData.role === 'admin'}
                         onChange={(e) => handleInputChange('role', e.target.value)}
@@ -528,7 +599,39 @@ export default function AdminUsersPage() {
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-white">Administrador</p>
-                        <p className="text-xs text-gray-500">Acceso completo y administración</p>
+                        <p className="text-xs text-gray-500">Acceso completo al sistema. Gestiona usuarios y proyectos.</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-700 rounded-lg cursor-pointer hover:border-gray-600 transition-colors">
+                      <input
+                        type="radio"
+                        name="role"
+                        value="user"
+                        checked={formData.role === 'user'}
+                        onChange={(e) => handleInputChange('role', e.target.value)}
+                        disabled={isCreating}
+                        className="h-4 w-4 text-signal-500 focus:ring-signal-500 border-gray-600"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-white">Usuario</p>
+                        <p className="text-xs text-gray-500">Puede crear proyectos propios y configurar notificaciones.</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-700 rounded-lg cursor-pointer hover:border-gray-600 transition-colors">
+                      <input
+                        type="radio"
+                        name="role"
+                        value="viewer"
+                        checked={formData.role === 'viewer'}
+                        onChange={(e) => handleInputChange('role', e.target.value)}
+                        disabled={isCreating}
+                        className="h-4 w-4 text-signal-500 focus:ring-signal-500 border-gray-600"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-white">Observador</p>
+                        <p className="text-xs text-gray-500">Solo lectura. Acceso a proyectos asignados por administrador.</p>
                       </div>
                     </label>
                   </div>
@@ -556,6 +659,106 @@ export default function AdminUsersPage() {
                       </>
                     ) : (
                       <span>Crear Usuario</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isResetModalOpen && resetUser && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center px-4">
+            <div
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={() => !isResetting && setIsResetModalOpen(false)}
+            />
+
+            <div className="relative bg-gray-950 border border-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white">Restablecer Contraseña</h2>
+                <button
+                  onClick={() => !isResetting && setIsResetModalOpen(false)}
+                  disabled={isResetting}
+                  className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="text-sm text-gray-400">
+                  Usuario: <span className="text-gray-200">{resetUser.email}</span>
+                </div>
+
+                <div>
+                  <label htmlFor="reset_password" className="block text-sm font-medium text-gray-300 mb-2">
+                    Nueva contraseña *
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-500" />
+                    </div>
+                    <input
+                      id="reset_password"
+                      type="password"
+                      required
+                      value={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.value)}
+                      disabled={isResetting}
+                      className="block w-full pl-10 pr-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-signal-500 focus:border-transparent transition-all disabled:opacity-50"
+                      placeholder="Mínimo 8 caracteres"
+                    />
+                  </div>
+                  {resetError && (
+                    <p className="mt-1 text-xs text-red-400">{resetError}</p>
+                  )}
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs text-gray-400">La contraseña debe contener:</p>
+                    <div className="space-y-0.5 text-xs">
+                      <div className={`flex items-center gap-1.5 ${resetPassword.length >= 8 ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${resetPassword.length >= 8 ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Mínimo 8 caracteres</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${/[a-zA-Z]/.test(resetPassword) ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${/[a-zA-Z]/.test(resetPassword) ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Al menos 1 letra</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${/[0-9]/.test(resetPassword) ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${/[0-9]/.test(resetPassword) ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Al menos 1 número</span>
+                      </div>
+                      <div className={`flex items-center gap-1.5 ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(resetPassword) ? 'text-green-400' : 'text-gray-500'}`}>
+                        <Check className={`h-3 w-3 ${/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(resetPassword) ? 'opacity-100' : 'opacity-30'}`} />
+                        <span>Al menos 1 símbolo (!@#$%...)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsResetModalOpen(false)}
+                    disabled={isResetting}
+                    className="flex-1 px-4 py-2.5 bg-gray-900 hover:bg-gray-800 text-gray-300 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isResetting}
+                    className="flex-1 px-4 py-2.5 bg-signal-500 hover:bg-signal-600 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isResetting ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span>Actualizando...</span>
+                      </>
+                    ) : (
+                      <span>Restablecer</span>
                     )}
                   </button>
                 </div>

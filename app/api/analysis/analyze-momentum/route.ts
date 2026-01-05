@@ -111,6 +111,12 @@ export async function POST(request: NextRequest) {
         data: { user },
       } = await supabase.auth.getUser();
 
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user?.id || '')
+        .single();
+
       const { data: project, error: projectError } = await supabase
         .from('projects')
         .select('id, owner_id, name')
@@ -124,7 +130,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (project.owner_id !== user?.id) {
+      if (project.owner_id !== user?.id && profile?.role !== 'admin') {
         return NextResponse.json(
           { success: false, error: 'No tienes permisos para este proyecto' },
           { status: 403 }
