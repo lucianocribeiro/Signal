@@ -136,7 +136,7 @@ export async function scrapeUrl(
     // Launch browser with appropriate configuration
     try {
       const executablePath = isProduction
-        ? await chromium.executablePath()
+        ? await chromium.executablePath('/tmp/chromium')
         : puppeteer.executablePath();
 
       console.log('[SCRAPER] Launching browser with executable:', executablePath);
@@ -151,10 +151,12 @@ export async function scrapeUrl(
             '--disable-setuid-sandbox',
             '--no-sandbox',
             '--single-process', // Critical for Vercel serverless
+            '--no-zygote',
           ],
           defaultViewport: chromium.defaultViewport,
           executablePath,
           headless: chromium.headless,
+          ignoreHTTPSErrors: true,
         }) as any;
       } else {
         // Local development: use standard puppeteer
