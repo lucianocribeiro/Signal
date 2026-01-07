@@ -109,9 +109,15 @@ export function detectPlatform(url: string): Platform {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname.toLowerCase();
+    const pathname = urlObj.pathname.toLowerCase();
 
     // Remove www. prefix for easier matching
     const domain = hostname.replace(/^www\./, '');
+
+    // Feed detection (RSS/Atom/XML)
+    if (pathname.endsWith('.xml') || pathname.endsWith('.rss') || url.toLowerCase().includes('/feed/')) {
+      return 'news';
+    }
 
     // Twitter/X detection
     if (domain === 'x.com' || domain === 'twitter.com') {

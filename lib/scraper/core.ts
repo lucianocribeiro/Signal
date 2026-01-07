@@ -10,7 +10,7 @@ import {
   getFoundSelectors,
 } from './dynamic-handler';
 import { scrapeRedditJson, scrapeWithReadability } from './fast-path';
-import { parseRSSFeed, isRSSFeed } from './rss-parser';
+import { parseRSSFeedXml, isRSSFeed } from './rss-parser';
 
 /**
  * Default scraper options
@@ -57,27 +57,32 @@ export async function scrapeUrl(
     new URL(url);
 
     if (isRSSFeed(url)) {
-      console.log('[Scraper] Detected RSS feed, using RSS parser');
+      console.log('[Scraper] Detected RSS feed URL, attempting XML fetch');
+      try {
+        const controller = new AbortController();
+        const feedTimeout = Math.min(config.timeout, 15000);
+        const timeoutId = setTimeout(() => controller.abort(), feedTimeout);
 
-      const rssResult = await parseRSSFeed(url);
-
-      if (!rssResult.success || rssResult.articles.length === 0) {
-        return {
-          success: false,
-          url,
-          timestamp: new Date(),
-          error: rssResult.error || 'No articles found in RSS feed',
-          metadata: {
-            domain: extractDomain(url),
-            duration: Date.now() - startTime,
-            platform: 'rss',
-            extractionMethod: 'rss-parser',
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': config.userAgent,
+            'Accept': 'application/rss+xml, application/xml, text/xml, */*',
           },
-        };
-      }
+        });
 
-      const combinedContent = rssResult.articles.map((article, index) => {
-        return `
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`Feed fetch failed with status ${response.status}`);
+        }
+
+        const xml = await response.text();
+        const rssResult = await parseRSSFeedXml(xml, url);
+
+        if (rssResult.success && rssResult.articles.length > 0) {
+          const combinedContent = rssResult.articles.map((article, index) => {
+            return `
 Article ${index + 1}: ${article.title}
 Published: ${article.pubDate}
 Link: ${article.link}
@@ -85,39 +90,45 @@ Content: ${article.description || article.content}
 
 ---
 `;
-      }).join('\n');
+          }).join('\n');
 
-      const wordCount = combinedContent.split(/\s+/).filter(word => word.length > 0).length;
+          const wordCount = combinedContent.split(/\s+/).filter(word => word.length > 0).length;
 
-      console.log('[Scraper] ✅ RSS feed parsed successfully');
-      console.log('[Scraper] Total content length:', combinedContent.length);
+          console.log('[Scraper] ✅ RSS feed parsed successfully');
+          console.log('[Scraper] Total content length:', combinedContent.length);
 
-      return {
-        success: true,
-        content: {
-          text: combinedContent,
-          title: rssResult.feedTitle,
-          url,
-          scrapedAt: new Date(),
-          wordCount,
-          metadata: {
-            articleCount: rssResult.articles.length,
-            articles: rssResult.articles.map(article => ({
-              title: article.title,
-              link: article.link,
-              pubDate: article.pubDate,
-            })),
-          },
-        },
-        url,
-        timestamp: new Date(),
-        metadata: {
-          domain: extractDomain(url),
-          duration: Date.now() - startTime,
-          platform: 'rss',
-          extractionMethod: 'rss-parser',
-        },
-      };
+          return {
+            success: true,
+            content: {
+              text: combinedContent,
+              title: rssResult.feedTitle,
+              url,
+              scrapedAt: new Date(),
+              wordCount,
+              metadata: {
+                articleCount: rssResult.articles.length,
+                articles: rssResult.articles.map(article => ({
+                  title: article.title,
+                  link: article.link,
+                  pubDate: article.pubDate,
+                })),
+              },
+            },
+            url,
+            timestamp: new Date(),
+            metadata: {
+              domain: extractDomain(url),
+              duration: Date.now() - startTime,
+              platform: 'rss',
+              extractionMethod: 'rss-parser',
+            },
+          };
+        }
+
+        console.warn('[Scraper] RSS feed parsed with no articles, falling back to Puppeteer');
+      } catch (rssError) {
+        console.warn('[Scraper] RSS feed fetch failed, falling back to Puppeteer', rssError);
+      }
     }
 
     // Detect platform from URL
