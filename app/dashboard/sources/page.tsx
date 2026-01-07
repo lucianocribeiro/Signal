@@ -13,7 +13,7 @@ interface Source {
   project_id: string;
   url: string;
   name: string | null;
-  source_type: 'twitter' | 'reddit' | 'news';
+  source_type: 'x_twitter' | 'twitter' | 'reddit' | 'news' | 'other';
   platform: string;
   is_active: boolean;
   last_scraped_at: string | null;
@@ -112,6 +112,66 @@ export default function SourcesPage() {
       console.error('Error deleting source:', err);
       throw err; // Re-throw to let modal handle it
     }
+  };
+
+  const handleSourceUpdated = (updatedSource: Source) => {
+    setSources((prev) => prev.map((source) => (source.id === updatedSource.id ? updatedSource : source)));
+    setSuccessMessage('Fuente actualizada correctamente');
+    setTimeout(() => {
+      setSuccessMessage(null);
+    }, 3000);
+  };
+
+  const handleSourceReactivated = (updatedSource: Source) => {
+    setSources((prev) => prev.map((source) => (source.id === updatedSource.id ? updatedSource : source)));
+    setSuccessMessage('Fuente reactivada correctamente');
+    setTimeout(() => {
+      setSuccessMessage(null);
+    }, 3000);
+  };
+
+  const handleUpdateSource = async (sourceId: string, updates: { url: string; name: string | null; source_type: Source['source_type'] }) => {
+    setError(null);
+    setSuccessMessage(null);
+
+    const response = await fetch(`/api/sources/${sourceId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al actualizar fuente');
+    }
+
+    handleSourceUpdated(data.source);
+    return data.source;
+  };
+
+  const handleReactivateSource = async (sourceId: string) => {
+    setError(null);
+    setSuccessMessage(null);
+
+    const response = await fetch(`/api/sources/${sourceId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ is_active: true }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Error al reactivar fuente');
+    }
+
+    handleSourceReactivated(data.source);
+    return data.source;
   };
 
   // Show loading state while projects are loading
@@ -277,7 +337,7 @@ export default function SourcesPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">
-                  {sources.filter((s) => s.source_type === 'twitter').length}
+                  {sources.filter((s) => s.source_type === 'twitter' || s.source_type === 'x_twitter').length}
                 </p>
                 <p className="text-sm text-gray-500">Twitter/X</p>
               </div>
@@ -331,6 +391,8 @@ export default function SourcesPage() {
             sources={filteredSources}
             isLoading={isLoadingSources}
             onDeleteClick={handleDeleteClick}
+            onUpdateSource={handleUpdateSource}
+            onReactivateSource={handleReactivateSource}
           />
         </div>
       </div>

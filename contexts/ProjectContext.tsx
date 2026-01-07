@@ -8,7 +8,7 @@ export interface Source {
   id: string;
   url: string;
   name: string | null;
-  source_type: 'twitter' | 'reddit' | 'news';
+  source_type: 'x_twitter' | 'twitter' | 'reddit' | 'news' | 'other';
   platform: string;
   is_active: boolean;
   last_scraped_at: string | null;
