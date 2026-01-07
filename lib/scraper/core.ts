@@ -10,6 +10,7 @@ import {
   getFoundSelectors,
 } from './dynamic-handler';
 import { scrapeRedditJson, scrapeWithReadability } from './fast-path';
+import { parseRSSFeed, isRSSFeed } from './rss-parser';
 
 /**
  * Default scraper options
@@ -54,6 +55,70 @@ export async function scrapeUrl(
   try {
     // Validate URL
     new URL(url);
+
+    if (isRSSFeed(url)) {
+      console.log('[Scraper] Detected RSS feed, using RSS parser');
+
+      const rssResult = await parseRSSFeed(url);
+
+      if (!rssResult.success || rssResult.articles.length === 0) {
+        return {
+          success: false,
+          url,
+          timestamp: new Date(),
+          error: rssResult.error || 'No articles found in RSS feed',
+          metadata: {
+            domain: extractDomain(url),
+            duration: Date.now() - startTime,
+            platform: 'rss',
+            extractionMethod: 'rss-parser',
+          },
+        };
+      }
+
+      const combinedContent = rssResult.articles.map((article, index) => {
+        return `
+Article ${index + 1}: ${article.title}
+Published: ${article.pubDate}
+Link: ${article.link}
+Content: ${article.description || article.content}
+
+---
+`;
+      }).join('\n');
+
+      const wordCount = combinedContent.split(/\s+/).filter(word => word.length > 0).length;
+
+      console.log('[Scraper] ✅ RSS feed parsed successfully');
+      console.log('[Scraper] Total content length:', combinedContent.length);
+
+      return {
+        success: true,
+        content: {
+          text: combinedContent,
+          title: rssResult.feedTitle,
+          url,
+          scrapedAt: new Date(),
+          wordCount,
+          metadata: {
+            articleCount: rssResult.articles.length,
+            articles: rssResult.articles.map(article => ({
+              title: article.title,
+              link: article.link,
+              pubDate: article.pubDate,
+            })),
+          },
+        },
+        url,
+        timestamp: new Date(),
+        metadata: {
+          domain: extractDomain(url),
+          duration: Date.now() - startTime,
+          platform: 'rss',
+          extractionMethod: 'rss-parser',
+        },
+      };
+    }
 
     // Detect platform from URL
     const platform = detectPlatform(url);

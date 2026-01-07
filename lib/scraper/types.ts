@@ -74,12 +74,22 @@ export interface ScrapedContent {
 
   /** Word count of extracted text */
   wordCount: number;
+
+  /** Optional metadata for specialized scrapes */
+  metadata?: {
+    articleCount?: number;
+    articles?: Array<{
+      title: string;
+      link: string;
+      pubDate: string;
+    }>;
+  };
 }
 
 /**
  * Supported platforms for platform-specific scraping
  */
-export type Platform = 'twitter' | 'reddit' | 'news' | 'generic';
+export type Platform = 'twitter' | 'reddit' | 'news' | 'generic' | 'rss';
 
 /**
  * Platform-specific configuration for dynamic content handling

@@ -78,6 +78,19 @@ const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
     scrollDelay: 0,
     waitTimeout: 5000,
   },
+
+  rss: {
+    name: 'rss',
+    selectors: [
+      'body',
+    ],
+    contentSelectors: [
+      'body',
+    ],
+    scrollCount: 0,
+    scrollDelay: 0,
+    waitTimeout: 5000,
+  },
 };
 
 /**
