@@ -202,19 +202,22 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const { id: projectId } = params;
-  console.log('[Project API DELETE] Starting delete for project:', projectId);
+  const projectId = params.id;
+  console.log('[API Delete Project] Starting deletion for project:', projectId);
 
   try {
     const supabase = await createServerClient();
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.error('[Project API DELETE] Auth error:', authError);
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.error('[API Delete Project] User not authenticated');
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     }
 
-    console.log('[Project API DELETE] User authenticated:', user.id);
+    console.log('[API Delete Project] User authenticated:', user.id);
 
     const { data: profile } = await supabase
       .from('user_profiles')
@@ -222,43 +225,62 @@ export async function DELETE(
       .eq('id', user.id)
       .single();
 
-    console.log('[Project API DELETE] User role:', profile?.role);
+    console.log('[API Delete Project] User role:', profile?.role);
 
-    // Verify ownership and delete
-    const deleteQuery = supabase
+    const { data: project, error: projectError } = await supabase
       .from('projects')
-      .delete()
-      .eq('id', projectId);
+      .select('id, name, owner_id')
+      .eq('id', projectId)
+      .single();
 
-    if (profile?.role !== 'admin') {
-      console.log('[Project API DELETE] Non-admin user, checking ownership');
-      deleteQuery.eq('owner_id', user.id);
+    if (projectError || !project) {
+      console.error('[API Delete Project] Project not found:', projectError);
+      return NextResponse.json(
+        { error: 'Proyecto no encontrado' },
+        { status: 404 }
+      );
     }
 
-    console.log('[Project API DELETE] Executing delete query...');
-    const { data: deletedData, error: deleteError } = await deleteQuery.select();
+    console.log('[API Delete Project] Found project:', project.name);
+
+    if (profile?.role !== 'admin' && project.owner_id !== user.id) {
+      console.error('[API Delete Project] Permission denied. Not admin and not owner.');
+      return NextResponse.json(
+        { error: 'No tienes permisos para eliminar este proyecto' },
+        { status: 403 }
+      );
+    }
+
+    console.log('[API Delete Project] Permission check passed');
+
+    console.log('[API Delete Project] Executing delete query...');
+
+    const { error: deleteError, data: deletedData } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+      .select();
 
     if (deleteError) {
-      console.error('[Project API DELETE] Error deleting project:', deleteError);
+      console.error('[API Delete Project] Delete failed:', deleteError);
       return NextResponse.json(
         { error: 'Error al eliminar proyecto: ' + deleteError.message },
         { status: 500 }
       );
     }
 
-    console.log('[Project API DELETE] Delete result:', deletedData);
+    console.log('[API Delete Project] Delete result:', deletedData);
 
     if (!deletedData || deletedData.length === 0) {
-      console.error('[Project API DELETE] No rows deleted - project not found or access denied');
+      console.error('[API Delete Project] No rows deleted');
       return NextResponse.json(
-        { error: 'Proyecto no encontrado o sin permisos' },
+        { error: 'Proyecto no encontrado o ya fue eliminado' },
         { status: 404 }
       );
     }
 
-    console.log('[Project API DELETE] ✅ Project deleted successfully');
+    console.log('[API Delete Project] ✅ Project deleted successfully');
 
-    // Log the action
     const supabaseService = createServiceClient();
     try {
       await supabaseService.from('audit_logs').insert({
@@ -268,15 +290,19 @@ export async function DELETE(
         resource_id: projectId,
       });
     } catch (auditError) {
-      console.warn('[Project API DELETE] Failed to log to audit_logs:', auditError);
+      console.warn('[API Delete Project] Failed to log to audit_logs:', auditError);
     }
 
     return NextResponse.json({
       success: true,
       message: 'Proyecto eliminado correctamente',
+      deleted: deletedData[0],
     });
   } catch (error) {
-    console.error('[Project API DELETE] Unexpected error:', error);
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+    console.error('[API Delete Project] Unexpected error:', error);
+    return NextResponse.json(
+      { error: 'Error interno del servidor' },
+      { status: 500 }
+    );
   }
 }

@@ -86,19 +86,21 @@ export default function ProjectsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    const projectName = project?.name || 'este proyecto';
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
+    console.log('[Projects Delete] Starting delete for:', { projectId, projectName });
 
-    console.log('[Projects Page] Attempting to delete project:', projectId);
+    const confirmed = window.confirm(
+      `¿Estás seguro de eliminar el proyecto "${projectName}"?\n\nEsta acción eliminará:\n- El proyecto\n- Todas las fuentes asociadas\n- Todas las señales\n\nEsta acción no se puede deshacer.`
+    );
 
-    if (!confirm(`¿Estás seguro de eliminar el proyecto "${projectName}"? Esta acción no se puede deshacer.`)) {
-      console.log('[Projects Page] Delete cancelled by user');
+    if (!confirmed) {
+      console.log('[Projects Delete] User cancelled deletion');
       return;
     }
 
+    console.log('[Projects Delete] User confirmed, calling API...');
+
     try {
-      console.log('[Projects Page] Sending DELETE request...');
       setError(null);
       setSuccess(null);
 
@@ -106,27 +108,25 @@ export default function ProjectsPage() {
         method: 'DELETE',
       });
 
-      console.log('[Projects Page] Response status:', response.status);
-      const result = await response.json();
-      console.log('[Projects Page] Response data:', result);
+      console.log('[Projects Delete] API response status:', response.status);
+      const data = await response.json();
+      console.log('[Projects Delete] API response data:', data);
 
       if (!response.ok) {
-        throw new Error(result.error || 'Error al eliminar proyecto');
+        throw new Error(data.error || 'Error al eliminar proyecto');
       }
 
-      console.log('[Projects Page] Delete successful, refreshing list...');
+      console.log('[Projects Delete] ✅ Delete successful');
       setSuccess(`Proyecto "${projectName}" eliminado correctamente`);
 
-      // Refresh projects list
       await fetchProjects();
 
-      // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccess(null);
       }, 3000);
-    } catch (err) {
-      console.error('[Projects Page] Delete failed:', err);
-      setError(err instanceof Error ? err.message : 'Error al eliminar proyecto');
+    } catch (error) {
+      console.error('[Projects Delete] ❌ Error:', error);
+      setError(error instanceof Error ? error.message : 'Error al eliminar proyecto');
     }
   };
 
@@ -263,7 +263,7 @@ export default function ProjectsPage() {
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(project.id)}
+                        onClick={() => handleDeleteProject(project.id, project.name)}
                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-800 rounded-lg transition-colors"
                         title="Eliminar proyecto"
                       >
