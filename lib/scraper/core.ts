@@ -22,6 +22,11 @@ const DEFAULT_OPTIONS: Required<ScraperOptions> = {
   userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 };
 
+const MIN_WORD_COUNT = 80;
+
+const shouldEnforceMinimumWordCount = (platform: string) =>
+  platform === 'news' || platform === 'rss' || platform === 'generic';
+
 /**
  * Scrape content from a URL using Puppeteer
  *
@@ -80,9 +85,9 @@ export async function scrapeUrl(
         const xml = await response.text();
         const rssResult = await parseRSSFeedXml(xml, url);
 
-        if (rssResult.success && rssResult.articles.length > 0) {
-          const combinedContent = rssResult.articles.map((article, index) => {
-            return `
+      if (rssResult.success && rssResult.articles.length > 0) {
+        const combinedContent = rssResult.articles.map((article, index) => {
+          return `
 Article ${index + 1}: ${article.title}
 Published: ${article.pubDate}
 Link: ${article.link}
@@ -92,10 +97,26 @@ Content: ${article.description || article.content}
 `;
           }).join('\n');
 
-          const wordCount = combinedContent.split(/\s+/).filter(word => word.length > 0).length;
+        const wordCount = combinedContent.split(/\s+/).filter(word => word.length > 0).length;
 
-          console.log('[Scraper] ✅ RSS feed parsed successfully');
-          console.log('[Scraper] Total content length:', combinedContent.length);
+        if (shouldEnforceMinimumWordCount('rss') && wordCount < MIN_WORD_COUNT) {
+          console.warn('[Scraper] RSS content below minimum word count, marking as failed');
+          return {
+            success: false,
+            url,
+            timestamp: new Date(),
+            error: `Content too short (${wordCount} words)`,
+            metadata: {
+              domain: extractDomain(url),
+              duration: Date.now() - startTime,
+              platform: 'rss',
+              extractionMethod: 'rss-parser',
+            },
+          };
+        }
+
+        console.log('[Scraper] ✅ RSS feed parsed successfully');
+        console.log('[Scraper] Total content length:', combinedContent.length);
 
           return {
             success: true,
@@ -145,6 +166,22 @@ Content: ${article.description || article.content}
         scrapingMethod = fastResult.method;
         const wordCount = fastResult.content.split(/\s+/).filter(word => word.length > 0).length;
 
+        if (shouldEnforceMinimumWordCount(platform) && wordCount < MIN_WORD_COUNT) {
+          console.warn('[Scraper] Fast path content below minimum word count, marking as failed');
+          return {
+            success: false,
+            url,
+            timestamp: new Date(),
+            error: `Content too short (${wordCount} words)`,
+            metadata: {
+              domain: extractDomain(url),
+              duration: Date.now() - startTime,
+              platform,
+              extractionMethod: 'fast-path',
+            },
+          };
+        }
+
         console.log(`[Scraper] ✅ Fast path succeeded in ${Date.now() - startTime}ms`);
 
         return {
@@ -176,6 +213,22 @@ Content: ${article.description || article.content}
       if (fastResult.success && fastResult.content.length > 0) {
         scrapingMethod = fastResult.method;
         const wordCount = fastResult.content.split(/\s+/).filter(word => word.length > 0).length;
+
+        if (shouldEnforceMinimumWordCount(platform) && wordCount < MIN_WORD_COUNT) {
+          console.warn('[Scraper] Fast path content below minimum word count, marking as failed');
+          return {
+            success: false,
+            url,
+            timestamp: new Date(),
+            error: `Content too short (${wordCount} words)`,
+            metadata: {
+              domain: extractDomain(url),
+              duration: Date.now() - startTime,
+              platform,
+              extractionMethod: 'fast-path',
+            },
+          };
+        }
 
         console.log(`[Scraper] ✅ Fast path succeeded in ${Date.now() - startTime}ms`);
 
@@ -314,11 +367,29 @@ Content: ${article.description || article.content}
       text = cleanText(text);
     }
 
+    // Get list of selectors that were found
+    const foundSelectors = await getFoundSelectors(page, platformConfig);
+
     // Calculate word count
     const wordCount = text.split(/\s+/).filter(word => word.length > 0).length;
 
-    // Get list of selectors that were found
-    const foundSelectors = await getFoundSelectors(page, platformConfig);
+    if (shouldEnforceMinimumWordCount(platform) && wordCount < MIN_WORD_COUNT) {
+      console.warn('[Scraper] Puppeteer content below minimum word count, marking as failed');
+      return {
+        success: false,
+        url,
+        timestamp: new Date(),
+        error: `Content too short (${wordCount} words)`,
+        metadata: {
+          domain: extractDomain(url),
+          duration: Date.now() - startTime,
+          platform,
+          selectorsFound: foundSelectors,
+          scrolled,
+          extractionMethod,
+        },
+      };
+    }
 
     // Prepare scraped content
     const content: ScrapedContent = {

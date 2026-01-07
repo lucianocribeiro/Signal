@@ -112,6 +112,7 @@ export async function detectNewSignals(
     }
 
     console.log(`[Signal Detection] AI detected ${aiResponse.signals.length} signals`);
+    console.log('[Signal Detection] Analysis notes:', aiResponse.analysis_notes || 'None');
 
     // Step 7: Create signals in database
     const createdSignals: CreatedSignal[] = [];
