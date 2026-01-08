@@ -83,6 +83,15 @@ export async function detectNewSignals(
       ingestionsToAnalyze
     );
 
+    const contentToAnalyze = ingestionsToAnalyze
+      .map(
+        (ing) =>
+          `[ID: ${ing.id}] [Fuente: ${ing.source.name}] [URL: ${ing.url}]\n${ing.content}`
+      )
+      .join('\n\n---\n\n');
+
+    console.log(`[Analysis] Sending ${contentToAnalyze.length} chars to Gemini`);
+
     console.log(`[Signal Detection] Calling Gemini API with ${ingestionsToAnalyze.length} items`);
 
     // Step 5: Call Gemini API

@@ -27,6 +27,23 @@ const MIN_WORD_COUNT = 80;
 const shouldEnforceMinimumWordCount = (platform: string) =>
   platform === 'news' || platform === 'rss' || platform === 'generic';
 
+const isHtmlResponse = (contentType: string | null, body: string) => {
+  if (contentType && contentType.toLowerCase().includes('text/html')) {
+    return true;
+  }
+  const lowerBody = body.trim().slice(0, 500).toLowerCase();
+  return lowerBody.startsWith('<!doctype html') || lowerBody.startsWith('<html');
+};
+
+const sanitizeRssXml = (rawXml: string) => {
+  const cleaned = rawXml.replace(
+    /&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[a-f\d]+);)/gi,
+    '&amp;'
+  );
+
+  return cleaned.replace(/<(?![/?a-zA-Z!])/g, '&lt;');
+};
+
 /**
  * Scrape content from a URL using Puppeteer
  *
@@ -82,12 +99,18 @@ export async function scrapeUrl(
           throw new Error(`Feed fetch failed with status ${response.status}`);
         }
 
-        const xml = await response.text();
-        const rssResult = await parseRSSFeedXml(xml, url);
+        const rawXml = await response.text();
 
-      if (rssResult.success && rssResult.articles.length > 0) {
-        const combinedContent = rssResult.articles.map((article, index) => {
-          return `
+        if (isHtmlResponse(response.headers.get('content-type'), rawXml)) {
+          throw new Error('Feed returned HTML content');
+        }
+
+        const sanitizedXml = sanitizeRssXml(rawXml);
+        const rssResult = await parseRSSFeedXml(sanitizedXml, url);
+
+        if (rssResult.success && rssResult.articles.length > 0) {
+          const combinedContent = rssResult.articles.map((article, index) => {
+            return `
 Article ${index + 1}: ${article.title}
 Published: ${article.pubDate}
 Link: ${article.link}
@@ -97,26 +120,26 @@ Content: ${article.description || article.content}
 `;
           }).join('\n');
 
-        const wordCount = combinedContent.split(/\s+/).filter(word => word.length > 0).length;
+          const wordCount = combinedContent.split(/\s+/).filter(word => word.length > 0).length;
 
-        if (shouldEnforceMinimumWordCount('rss') && wordCount < MIN_WORD_COUNT) {
-          console.warn('[Scraper] RSS content below minimum word count, marking as failed');
-          return {
-            success: false,
-            url,
-            timestamp: new Date(),
-            error: `Content too short (${wordCount} words)`,
-            metadata: {
-              domain: extractDomain(url),
-              duration: Date.now() - startTime,
-              platform: 'rss',
-              extractionMethod: 'rss-parser',
-            },
-          };
-        }
+          if (shouldEnforceMinimumWordCount('rss') && wordCount < MIN_WORD_COUNT) {
+            console.warn('[Scraper] RSS content below minimum word count, marking as failed');
+            return {
+              success: false,
+              url,
+              timestamp: new Date(),
+              error: `Content too short (${wordCount} words)`,
+              metadata: {
+                domain: extractDomain(url),
+                duration: Date.now() - startTime,
+                platform: 'rss',
+                extractionMethod: 'rss-parser',
+              },
+            };
+          }
 
-        console.log('[Scraper] ✅ RSS feed parsed successfully');
-        console.log('[Scraper] Total content length:', combinedContent.length);
+          console.log('[Scraper] ✅ RSS feed parsed successfully');
+          console.log('[Scraper] Total content length:', combinedContent.length);
 
           return {
             success: true,
@@ -148,7 +171,7 @@ Content: ${article.description || article.content}
 
         console.warn('[Scraper] RSS feed parsed with no articles, falling back to Puppeteer');
       } catch (rssError) {
-        console.warn('[Scraper] RSS feed fetch failed, falling back to Puppeteer', rssError);
+        console.warn('[Scraper] RSS feed fetch/parse failed, falling back to Puppeteer', rssError);
       }
     }
 
