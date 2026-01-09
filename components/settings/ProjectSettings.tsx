@@ -13,6 +13,7 @@ interface ProjectSettingsProps {
     name: string;
     description: string | null;
     created_at: string;
+    updated_at: string;
     settings?: {
       refresh_interval_hours?: number;
     } | null;
@@ -58,7 +59,13 @@ export default function ProjectSettings({ project, onProjectUpdated }: ProjectSe
     setName(project.name);
     setDescription(project.description ?? '');
     setRefreshInterval(project.settings?.refresh_interval_hours ?? 4);
-  }, [project.id, project.name, project.description, project.settings?.refresh_interval_hours]);
+  }, [
+    project.id,
+    project.name,
+    project.description,
+    project.updated_at,
+    project.settings?.refresh_interval_hours,
+  ]);
 
   const nameError = useMemo(() => {
     if (!name.trim()) return 'El nombre es requerido';
@@ -101,6 +108,7 @@ export default function ProjectSettings({ project, onProjectUpdated }: ProjectSe
         ...project,
         name: data.project?.name ?? name.trim(),
         description: data.project?.description ?? (description.trim() || null),
+        updated_at: data.project?.updated_at ?? project.updated_at,
         settings: data.project?.settings ?? {
           refresh_interval_hours: refreshInterval,
         },
