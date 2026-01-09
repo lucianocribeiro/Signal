@@ -1,17 +1,11 @@
-import { tavily } from '@tavily/core';
+import { tavily, TavilyExtractResponse } from '@tavily/core';
 
+// Note: TavilyExtractResult is not exported by SDK, so we define it based on the response structure
 export interface TavilyExtractResult {
   url: string;
-  raw_content: string;
+  rawContent: string;
   images?: string[];
   favicon?: string;
-}
-
-export interface TavilyExtractResponse {
-  results: TavilyExtractResult[];
-  failed_results: { url: string; error: string }[];
-  response_time: number;
-  request_id: string;
 }
 
 export interface ExtractedContent {
@@ -74,15 +68,15 @@ export class TavilyClient {
 
   private async extractWithRetry(urls: string[], attempt = 1): Promise<TavilyExtractResponse> {
     try {
-      const response = await this.client.extract({
-        urls,
+      // FIXED: URLs as first parameter, options as second parameter
+      const response = await this.client.extract(urls, {
         extractDepth: 'advanced',
         format: 'markdown',
         includeImages: false,
         timeout: 30,
       });
 
-      return response as TavilyExtractResponse;
+      return response;
     } catch (error) {
       console.error(`[Tavily] Attempt ${attempt} failed:`, error);
 
@@ -100,7 +94,7 @@ export class TavilyClient {
     const results: ExtractedContent[] = [];
 
     for (const result of response.results) {
-      const content = result.raw_content || '';
+      const content = result.rawContent || '';
       const wordCount = content.split(/\s+/).filter((word) => word.length > 0).length;
 
       if (wordCount < 100) {
@@ -126,7 +120,7 @@ export class TavilyClient {
       });
     }
 
-    for (const failed of response.failed_results) {
+    for (const failed of response.failedResults) {
       console.error(`[Tavily] Failed to extract ${failed.url}: ${failed.error}`);
       results.push({
         url: failed.url,
