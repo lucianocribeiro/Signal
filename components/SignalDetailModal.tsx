@@ -8,7 +8,8 @@ interface SignalDetailModalProps {
   signal: Signal | null;
   isOpen: boolean;
   onClose: () => void;
-  onArchive: (id: string) => void;
+  onArchive: (signal: Signal) => void;
+  isArchiving?: boolean;
 }
 
 export default function SignalDetailModal({
@@ -16,6 +17,7 @@ export default function SignalDetailModal({
   isOpen,
   onClose,
   onArchive,
+  isArchiving = false,
 }: SignalDetailModalProps) {
   if (!isOpen || !signal) return null;
 
@@ -162,13 +164,11 @@ export default function SignalDetailModal({
               Cerrar
             </button>
             <button
-              onClick={() => {
-                onArchive(signal.id);
-                onClose();
-              }}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors"
+              onClick={() => onArchive(signal)}
+              disabled={isArchiving}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors disabled:bg-gray-800/60 disabled:text-gray-500"
             >
-              Archivar
+              {isArchiving ? 'Archivando...' : 'Archivar'}
             </button>
           </div>
         </div>

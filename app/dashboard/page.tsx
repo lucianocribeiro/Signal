@@ -5,6 +5,8 @@ import { TrendingUp, Activity, Filter, FolderKanban, Plus, Loader2, Zap, Downloa
 import { useRouter } from 'next/navigation';
 import SignalCard, { Signal } from '@/components/SignalCard';
 import SignalDetailModal from '@/components/SignalDetailModal';
+import ConfirmArchiveDialog from '@/components/ConfirmArchiveDialog';
+import Toast, { ToastType } from '@/components/ui/toast';
 import { useProjects } from '@/contexts/ProjectContext';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -16,6 +18,9 @@ export default function DashboardPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [isLoadingSignals, setIsLoadingSignals] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: ToastType; message: string } | null>(null);
+  const [confirmSignal, setConfirmSignal] = useState<Signal | null>(null);
+  const [archivingSignalId, setArchivingSignalId] = useState<string | null>(null);
 
   // Manual trigger states
   const [isScraperRunning, setIsScraperRunning] = useState(false);
@@ -64,15 +69,20 @@ export default function DashboardPage() {
   const monitoringSignals = signals.filter((s) => s.status === 'Stabilizing' || s.status === 'New');
 
   // Archive signal (real database update)
-  const handleArchive = async (signalId: string) => {
-    try {
-      console.log('[Dashboard] Archiving signal:', signalId);
+  const handleArchive = async (signal: Signal) => {
+    if (archivingSignalId) return;
 
-      const response = await fetch('/api/signals', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signal_id: signalId, status: 'Archived' }),
-      });
+    const previousSignals = signals;
+    const restoreIndex = previousSignals.findIndex((item) => item.id === signal.id);
+
+    try {
+      console.log('[Dashboard] Archiving signal:', signal.id);
+      setToast(null);
+      setArchivingSignalId(signal.id);
+
+      setSignals((prev) => prev.filter((item) => item.id !== signal.id));
+
+      const response = await fetch(`/api/signals/${signal.id}/archive`, { method: 'PATCH' });
 
       if (!response.ok) {
         throw new Error('Error al archivar señal');
@@ -80,16 +90,41 @@ export default function DashboardPage() {
 
       console.log('[Dashboard] Signal archived successfully');
 
-      // Remove from local state immediately for responsive UI
-      setSignals((prev) => prev.filter((s) => s.id !== signalId));
-
       // Close modal if this signal was selected
-      if (selectedSignal?.id === signalId) {
+      if (selectedSignal?.id === signal.id) {
         setSelectedSignal(null);
       }
+
+      setToast({ type: 'success', message: 'Señal archivada exitosamente' });
+      return true;
     } catch (err) {
       console.error('[Dashboard] Error archiving signal:', err);
       setError('Error al archivar la señal');
+      setToast({ type: 'error', message: 'Error al archivar la señal' });
+
+      if (restoreIndex >= 0) {
+        setSignals((prev) => {
+          const restored = [...prev];
+          restored.splice(restoreIndex, 0, signal);
+          return restored;
+        });
+      }
+      return false;
+    } finally {
+      setArchivingSignalId(null);
+    }
+  };
+
+  const handleArchiveRequest = (signal: Signal) => {
+    setConfirmSignal(signal);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!confirmSignal) return;
+    const signalToArchive = confirmSignal;
+    const success = await handleArchive(signalToArchive);
+    if (success) {
+      setConfirmSignal(null);
     }
   };
 
@@ -393,6 +428,8 @@ export default function DashboardPage() {
                   key={signal.id}
                   signal={signal}
                   onClick={() => setSelectedSignal(signal)}
+                  onArchive={handleArchiveRequest}
+                  isArchiving={archivingSignalId === signal.id}
                 />
               ))}
             </div>
@@ -418,6 +455,8 @@ export default function DashboardPage() {
                   key={signal.id}
                   signal={signal}
                   onClick={() => setSelectedSignal(signal)}
+                  onArchive={handleArchiveRequest}
+                  isArchiving={archivingSignalId === signal.id}
                 />
               ))}
             </div>
@@ -468,8 +507,24 @@ export default function DashboardPage() {
         signal={selectedSignal}
         isOpen={!!selectedSignal}
         onClose={() => setSelectedSignal(null)}
-        onArchive={handleArchive}
+        onArchive={handleArchiveRequest}
+        isArchiving={archivingSignalId === selectedSignal?.id}
       />
+
+      <ConfirmArchiveDialog
+        isOpen={!!confirmSignal}
+        isLoading={archivingSignalId === confirmSignal?.id}
+        onCancel={() => setConfirmSignal(null)}
+        onConfirm={handleConfirmArchive}
+      />
+
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

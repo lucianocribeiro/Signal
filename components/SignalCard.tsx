@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, ExternalLink, TrendingUp, Minus, Clock } from 'lucide-react';
+import { AlertTriangle, ExternalLink, TrendingUp, Minus, Clock, Archive } from 'lucide-react';
 
 export type RiskLevel = 'watch_closely' | 'monitor';
 
@@ -40,9 +40,16 @@ function formatRelativeTime(dateString: string): string {
 interface SignalCardProps {
   signal: Signal;
   onClick: () => void;
+  onArchive: (signal: Signal) => void;
+  isArchiving?: boolean;
 }
 
-export default function SignalCard({ signal, onClick }: SignalCardProps) {
+export default function SignalCard({
+  signal,
+  onClick,
+  onArchive,
+  isArchiving = false,
+}: SignalCardProps) {
   return (
     <div
       onClick={onClick}
@@ -112,7 +119,7 @@ export default function SignalCard({ signal, onClick }: SignalCardProps) {
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-3 border-t border-gray-800">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-gray-800">
         {signal.source_url ? (
           <a
             href={signal.source_url}
@@ -130,11 +137,24 @@ export default function SignalCard({ signal, onClick }: SignalCardProps) {
           </span>
         )}
 
-        {signal.evidence_count && signal.evidence_count > 0 && (
-          <span className="text-xs text-gray-500">
-            {signal.evidence_count} fuente{signal.evidence_count !== 1 ? 's' : ''}
-          </span>
-        )}
+        <div className="flex items-center gap-3 ml-auto">
+          {signal.evidence_count && signal.evidence_count > 0 && (
+            <span className="text-xs text-gray-500">
+              {signal.evidence_count} fuente{signal.evidence_count !== 1 ? 's' : ''}
+            </span>
+          )}
+          <button
+            onClick={(event) => {
+              event.stopPropagation();
+              onArchive(signal);
+            }}
+            disabled={isArchiving}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors disabled:text-gray-600"
+          >
+            <Archive className="h-3 w-3" />
+            {isArchiving ? 'Archivando...' : 'Archivar'}
+          </button>
+        </div>
       </div>
     </div>
   );
