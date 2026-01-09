@@ -2,10 +2,7 @@
   "crons": [
     {
       "path": "/api/scrape/trigger",
-      "schedule": "0 */2 * * *",
-      "headers": {
-        "Authorization": "Bearer ${SCRAPER_SECRET}"
-      }
+      "schedule": "0 */2 * * *"
     },
     {
       "path": "/api/cron/scrape",

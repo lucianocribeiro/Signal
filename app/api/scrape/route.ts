@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@/lib/supabase/server';
-import { scrapeTwitter, scrapeReddit, scrapeNews } from '@/lib/apify-client';
+import {
+  scrapeTwitter,
+  scrapeReddit,
+  scrapeNewsApifyFallback,
+  scrapeNewsReadabilityFallback,
+} from '@/lib/apify-client';
+import { ExtractedContent, getTavilyClient } from '@/lib/tavily-client';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -156,9 +162,18 @@ async function insertRawIngestion(params: {
   throw new Error(error.message);
 }
 
+function chunkArray<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 async function scrapeSource(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  source: SourceRecord
+  source: SourceRecord,
+  tavilyResult?: ExtractedContent
 ) {
   const startTime = Date.now();
   const logId = await insertScraperLog(supabase, source.id);
@@ -166,18 +181,80 @@ async function scrapeSource(
   let itemsProcessed = 0;
   let duplicates = 0;
   const ingestionErrors: string[] = [];
+  const fallbackErrors: string[] = [];
 
   try {
     console.log('[Scrape] Starting source', source.id, source.url, source.source_type);
 
     let items: { content: string; url: string; metadata: Record<string, unknown> }[] = [];
 
-    if (source.source_type === 'twitter') {
+    if (source.source_type === 'twitter' || source.source_type === 'x_twitter') {
       ({ items } = await scrapeTwitter(source.url));
     } else if (source.source_type === 'reddit') {
       ({ items } = await scrapeReddit(source.url));
     } else {
-      ({ items } = await scrapeNews(source.url));
+      let finalContent = '';
+      let finalWordCount = 0;
+      let finalMethod: 'tavily' | 'apify' | 'readability' | null = null;
+
+      if (tavilyResult?.success) {
+        finalContent = tavilyResult.content;
+        finalWordCount = tavilyResult.wordCount;
+        finalMethod = 'tavily';
+        console.log(`[Scrape] Tavily success for ${source.url} (${finalWordCount} words)`);
+      } else {
+        if (tavilyResult?.error) {
+          fallbackErrors.push(`tavily: ${tavilyResult.error}`);
+        }
+
+        console.log(`[Scrape] Tavily failed for ${source.url}, trying Apify fallback...`);
+        const apifyResult = await scrapeNewsApifyFallback(source.url);
+
+        if (apifyResult.success) {
+          finalContent = apifyResult.content;
+          finalWordCount = apifyResult.wordCount;
+          finalMethod = 'apify';
+          console.log(`[Scrape] Apify fallback success for ${source.url} (${finalWordCount} words)`);
+        } else {
+          if (apifyResult.error) {
+            fallbackErrors.push(`apify: ${apifyResult.error}`);
+          }
+
+          console.log(`[Scrape] Apify failed for ${source.url}, trying Readability fallback...`);
+          const readabilityResult = await scrapeNewsReadabilityFallback(source.url);
+
+          if (readabilityResult.success) {
+            finalContent = readabilityResult.content;
+            finalWordCount = readabilityResult.wordCount;
+            finalMethod = 'readability';
+            console.log(
+              `[Scrape] Readability fallback success for ${source.url} (${finalWordCount} words)`
+            );
+          } else if (readabilityResult.error) {
+            fallbackErrors.push(`readability: ${readabilityResult.error}`);
+          }
+        }
+      }
+
+      if (!finalMethod || !finalContent) {
+        throw new Error(
+          fallbackErrors.length
+            ? fallbackErrors.join(' | ')
+            : 'All scraping methods failed'
+        );
+      }
+
+      items = [
+        {
+          content: finalContent,
+          url: source.url,
+          metadata: {
+            method: finalMethod,
+            wordCount: finalWordCount,
+            tavily_error: tavilyResult?.error ?? null,
+          },
+        },
+      ];
     }
 
     itemsFound = items.length;
@@ -261,11 +338,79 @@ export async function executeScrape(sourceId?: string): Promise<ScrapeSummary> {
   let newItems = 0;
   let duplicates = 0;
 
-  for (const source of sources) {
+  const twitterSources = sources.filter(
+    (source) => source.source_type === 'twitter' || source.source_type === 'x_twitter'
+  );
+  const redditSources = sources.filter((source) => source.source_type === 'reddit');
+  const newsSources = sources.filter(
+    (source) =>
+      source.source_type !== 'twitter' &&
+      source.source_type !== 'x_twitter' &&
+      source.source_type !== 'reddit'
+  );
+
+  for (const source of twitterSources) {
     const result = await scrapeSource(supabase, source);
     scraped += 1;
     newItems += result.itemsProcessed;
     duplicates += result.duplicates;
+  }
+
+  for (const source of redditSources) {
+    const result = await scrapeSource(supabase, source);
+    scraped += 1;
+    newItems += result.itemsProcessed;
+    duplicates += result.duplicates;
+  }
+
+  if (newsSources.length > 0) {
+    console.log(`[Scrape] Processing ${newsSources.length} news sources with Tavily batches...`);
+    let tavilyClient: ReturnType<typeof getTavilyClient> | null = null;
+
+    try {
+      tavilyClient = getTavilyClient();
+    } catch (error) {
+      console.error('[Scrape] Tavily client initialization failed:', error);
+    }
+    const batches = chunkArray(newsSources, 20);
+
+    for (const batch of batches) {
+      const urls = batch.map((source) => source.url);
+      let tavilyResults: ExtractedContent[] = [];
+
+      try {
+        if (!tavilyClient) {
+          throw new Error('Tavily client not available');
+        }
+
+        tavilyResults = await tavilyClient.extractNewsContent(urls);
+      } catch (error) {
+        console.error('[Scrape] Tavily batch extraction failed:', error);
+        tavilyResults = urls.map((url) => ({
+          url,
+          content: '',
+          wordCount: 0,
+          success: false,
+          method: 'tavily',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }));
+      }
+
+      for (const source of batch) {
+        const tavilyResult = tavilyResults.find((result) => result.url === source.url) ?? {
+          url: source.url,
+          content: '',
+          wordCount: 0,
+          success: false,
+          method: 'tavily',
+          error: 'No Tavily result',
+        };
+        const result = await scrapeSource(supabase, source, tavilyResult);
+        scraped += 1;
+        newItems += result.itemsProcessed;
+        duplicates += result.duplicates;
+      }
+    }
   }
 
   return { scraped, new_items: newItems, duplicates };

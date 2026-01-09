@@ -2,7 +2,7 @@
  * Signal Evidence API Endpoint
  * Epic 4 Story 4.4: Link Evidence (Raw Data) to Signals
  *
- * GET /api/signals/[signalId]/evidence
+ * GET /api/signals/[id]/evidence
  * Returns all evidence (raw_ingestions) linked to a specific signal
  */
 
@@ -20,16 +20,16 @@ export const dynamic = 'force-dynamic';
  * Includes full ingestion content and source information
  *
  * @param request - Next.js request object
- * @param params - Route parameters containing signalId
+ * @param params - Route parameters containing id
  * @returns JSON response with signal evidence
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { signalId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     console.log('[Signal Evidence API] === Request started ===');
-    console.log('[Signal Evidence API] Signal ID:', params.signalId);
+    console.log('[Signal Evidence API] Signal ID:', params.id);
 
     const supabase = await createClient();
 
@@ -48,7 +48,7 @@ export async function GET(
 
     console.log('[Signal Evidence API] User authenticated:', user.id);
 
-    const { signalId } = params;
+    const signalId = params.id;
 
     const { data: profile } = await supabase
       .from('user_profiles')

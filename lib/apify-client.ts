@@ -1,4 +1,6 @@
 import { ApifyClient } from 'apify-client';
+import { Readability } from '@mozilla/readability';
+import { JSDOM } from 'jsdom';
 
 export type ApifyScrapeItem = {
   content: string;
@@ -177,4 +179,145 @@ export async function scrapeNews(url: string): Promise<ApifyScrapeResult> {
     .filter((item): item is ApifyScrapeItem => Boolean(item));
 
   return { items: normalized };
+}
+
+/**
+ * Scrape news content with Apify web-scraper (FALLBACK TIER 2)
+ * This is used when Tavily fails
+ */
+export async function scrapeNewsApifyFallback(url: string): Promise<{
+  content: string;
+  wordCount: number;
+  success: boolean;
+  method: 'apify';
+  error?: string;
+}> {
+  console.log(`[Apify Fallback] Attempting to scrape ${url}...`);
+
+  try {
+    const items = await callActorWithRetry('apify/web-scraper', {
+      startUrls: [{ url }],
+      pageFunction: `async function pageFunction(context) {
+        const { page } = context;
+        const content = await page.evaluate(() => document.body.innerText);
+        return { content };
+      }`,
+      maxRequestsPerCrawl: 1,
+      maxConcurrency: 1,
+    });
+
+    const firstItem = items?.[0] as { content?: string } | undefined;
+    const content = firstItem?.content ?? '';
+    const wordCount = content.split(/\s+/).filter((word: string) => word.length > 0).length;
+
+    if (!content) {
+      return {
+        content: '',
+        wordCount: 0,
+        success: false,
+        method: 'apify',
+        error: 'No content extracted',
+      };
+    }
+
+    if (wordCount < 100) {
+      console.warn(`[Apify Fallback] Content too short: ${wordCount} words`);
+      return {
+        content,
+        wordCount,
+        success: false,
+        method: 'apify',
+        error: 'Content too short',
+      };
+    }
+
+    console.log(`[Apify Fallback] Successfully scraped: ${wordCount} words`);
+    return {
+      content,
+      wordCount,
+      success: true,
+      method: 'apify',
+    };
+  } catch (error) {
+    console.error('[Apify Fallback] Error:', error);
+    return {
+      content: '',
+      wordCount: 0,
+      success: false,
+      method: 'apify',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Scrape news content with Readability (FALLBACK TIER 3)
+ * This is used when both Tavily and Apify fail
+ */
+export async function scrapeNewsReadabilityFallback(url: string): Promise<{
+  content: string;
+  wordCount: number;
+  success: boolean;
+  method: 'readability';
+  error?: string;
+}> {
+  console.log(`[Readability Fallback] Attempting to scrape ${url}...`);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const html = await response.text();
+    const dom = new JSDOM(html, { url });
+    const reader = new Readability(dom.window.document);
+    const article = reader.parse();
+
+    if (!article || !article.textContent) {
+      return {
+        content: '',
+        wordCount: 0,
+        success: false,
+        method: 'readability',
+        error: 'Failed to parse article',
+      };
+    }
+
+    const content = article.textContent;
+    const wordCount = content.split(/\s+/).filter((word) => word.length > 0).length;
+
+    if (wordCount < 100) {
+      console.warn(`[Readability Fallback] Content too short: ${wordCount} words`);
+      return {
+        content,
+        wordCount,
+        success: false,
+        method: 'readability',
+        error: 'Content too short',
+      };
+    }
+
+    console.log(`[Readability Fallback] Successfully scraped: ${wordCount} words`);
+    return {
+      content,
+      wordCount,
+      success: true,
+      method: 'readability',
+    };
+  } catch (error) {
+    console.error('[Readability Fallback] Error:', error);
+    return {
+      content: '',
+      wordCount: 0,
+      success: false,
+      method: 'readability',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
 }
