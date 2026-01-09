@@ -142,7 +142,7 @@ async function insertRawIngestion(params: {
 }) {
   const contentHash = buildContentHash(params.content);
 
-  const { error } = await supabase.from('raw_ingestions').insert({
+  const { error } = await params.supabase.from('raw_ingestions').insert({
     source_id: params.sourceId,
     project_id: params.projectId,
     content: params.content,
