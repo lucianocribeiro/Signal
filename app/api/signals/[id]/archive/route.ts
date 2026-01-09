@@ -44,7 +44,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Señal no encontrada' }, { status: 404 });
     }
 
-    const ownerId = (signal.projects as { owner_id: string }).owner_id;
+    const projects = signal.projects as Array<{ owner_id: string }>;
+    if (!projects || projects.length === 0) {
+      return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
+    }
+
+    const ownerId = projects[0].owner_id;
     if (profile?.role !== 'admin' && ownerId !== user.id) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
