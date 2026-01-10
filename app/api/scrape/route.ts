@@ -8,6 +8,9 @@ import {
   scrapeNewsReadabilityFallback,
 } from '@/lib/apify-client';
 import { ExtractedContent, getTavilyClient } from '@/lib/tavily-client';
+import { analyzeContentWithGemini } from '@/lib/gemini-client';
+import { storeSignals } from '@/lib/signal-storage';
+import { logTokenUsage } from '@/lib/analysis/logUsage';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -26,6 +29,8 @@ type ScrapeSummary = {
   new_items: number;
   duplicates: number;
 };
+
+type AnalysisSourceType = 'news' | 'twitter' | 'reddit';
 
 function getAuthError(request: NextRequest) {
   const secret = process.env.SCRAPER_SECRET;
@@ -132,6 +137,16 @@ function buildContentHash(content: string) {
   return crypto.createHash('sha256').update(content).digest('hex');
 }
 
+function resolveAnalysisSourceType(sourceType: string): AnalysisSourceType {
+  if (sourceType === 'reddit') {
+    return 'reddit';
+  }
+  if (sourceType === 'twitter' || sourceType === 'x_twitter') {
+    return 'twitter';
+  }
+  return 'news';
+}
+
 async function insertRawIngestion(params: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   sourceId: string;
@@ -142,17 +157,23 @@ async function insertRawIngestion(params: {
 }) {
   const contentHash = buildContentHash(params.content);
 
-  const { error } = await params.supabase.from('raw_ingestions').insert({
-    source_id: params.sourceId,
-    project_id: params.projectId,
-    content: params.content,
-    content_hash: contentHash,
-    url: params.url,
-    metadata: params.metadata,
-  });
+  const { data, error } = await params.supabase
+    .from('raw_ingestions')
+    .insert({
+      source_id: params.sourceId,
+      project_id: params.projectId,
+      content: params.content,
+      content_hash: contentHash,
+      url: params.url,
+      metadata: params.metadata,
+      status: 'pending_analysis',
+      scraped_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
 
   if (!error) {
-    return { inserted: true, duplicate: false };
+    return { inserted: true, duplicate: false, ingestionId: data?.id as string };
   }
 
   if (error.code === '23505') {
@@ -181,6 +202,7 @@ async function scrapeSource(
   let itemsProcessed = 0;
   let duplicates = 0;
   const ingestionErrors: string[] = [];
+  const analysisErrors: string[] = [];
   const fallbackErrors: string[] = [];
 
   try {
@@ -283,6 +305,82 @@ async function scrapeSource(
 
         if (result.inserted) {
           itemsProcessed += 1;
+          const ingestionId = result.ingestionId;
+          if (!ingestionId) {
+            console.warn('[Scrape] Missing ingestion ID after insert, skipping analysis');
+            continue;
+          }
+
+          try {
+            console.log(`[Scrape] Starting AI analysis for ingestion ${ingestionId}`);
+            const analysisStart = Date.now();
+
+            const analysisResult = await analyzeContentWithGemini({
+              projectId: source.project_id,
+              ingestionId,
+              content,
+              sourceType: resolveAnalysisSourceType(source.source_type),
+              sourceUrl: item.url || source.url,
+            });
+
+            const analysisDuration = Date.now() - analysisStart;
+            console.log(
+              `[Scrape] AI analysis complete for ${ingestionId}: ${analysisResult.signals.length} signals in ${analysisDuration}ms`
+            );
+
+            await storeSignals({
+              projectId: source.project_id,
+              ingestionId,
+              sourceId: source.id,
+              sourceUrl: item.url || source.url,
+              signals: analysisResult.signals,
+            });
+
+            const { error: statusError } = await supabase
+              .from('raw_ingestions')
+              .update({
+                status: 'analyzed',
+                analyzed_at: new Date().toISOString(),
+                error_message: null,
+              })
+              .eq('id', ingestionId);
+
+            if (statusError) {
+              console.error('[Scrape] Failed to update ingestion status', statusError);
+            } else {
+              console.log(`[Scrape] Updated ingestion ${ingestionId} status to analyzed`);
+            }
+
+            try {
+              await logTokenUsage(
+                source.project_id,
+                'ingestion_analysis',
+                'gemini-1.5-flash',
+                analysisResult.promptTokens,
+                analysisResult.completionTokens,
+                {
+                  ingestion_id: ingestionId,
+                  signals_detected: analysisResult.signals.length,
+                  duration_ms: analysisDuration,
+                  source_url: item.url || source.url,
+                }
+              );
+            } catch (usageError) {
+              console.error('[Scrape] Failed to log token usage', usageError);
+            }
+          } catch (analysisError) {
+            const message = analysisError instanceof Error ? analysisError.message : 'Unknown analysis error';
+            analysisErrors.push(message);
+            console.error(`[Scrape] AI analysis failed for ${ingestionId}`, analysisError);
+
+            await supabase
+              .from('raw_ingestions')
+              .update({
+                status: 'analysis_failed',
+                error_message: message,
+              })
+              .eq('id', ingestionId);
+          }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown insert error';
@@ -297,7 +395,10 @@ async function scrapeSource(
       itemsFound,
       itemsProcessed,
       durationMs: Date.now() - startTime,
-      errorMessage: ingestionErrors.length ? ingestionErrors.join(' | ') : null,
+      errorMessage:
+        ingestionErrors.length || analysisErrors.length
+          ? [...ingestionErrors, ...analysisErrors].join(' | ')
+          : null,
     });
 
     return {
