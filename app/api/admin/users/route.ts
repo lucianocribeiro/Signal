@@ -171,10 +171,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: authError }, { status: 403 });
     }
 
+    const supabase = await createServerClient();
+
     // Get all user profiles
-    const { data: profiles, error: profilesError } = await supabaseAdmin
+    const { data: profiles, error: profilesError } = await supabase
       .from('user_profiles')
-      .select('id, role, full_name, phone_number, created_at')
+      .select('id, email, full_name, role, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (profilesError) {
@@ -185,27 +187,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get auth users to get emails
-    const { data: authUsers, error: authUsersError } = await supabaseAdmin.auth.admin.listUsers();
+    const users = profiles || [];
+    const stats = {
+      total: users.length,
+      admins: users.filter((user) => user.role === 'admin').length,
+      users: users.filter((user) => user.role === 'user').length,
+      viewers: users.filter((user) => user.role === 'viewer').length,
+    };
 
-    if (authUsersError) {
-      console.error('Error fetching auth users:', authUsersError);
-      return NextResponse.json(
-        { error: 'Error al obtener usuarios' },
-        { status: 500 }
-      );
-    }
-
-    // Merge profiles with auth data
-    const users = profiles.map(profile => {
-      const authUser = authUsers.users.find(u => u.id === profile.id);
-      return {
-        ...profile,
-        email: authUser?.email || 'Email no disponible'
-      };
-    });
-
-    return NextResponse.json({ users }, { status: 200 });
+    return NextResponse.json({ users, stats }, { status: 200 });
 
   } catch (error) {
     console.error('Unexpected error listing users:', error);

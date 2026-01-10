@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Radio, FolderKanban, Settings, ChevronDown, User, LogOut, Loader2, Users, ChevronLeft, ChevronRight, Bug } from 'lucide-react';
+import { LayoutDashboard, Radio, FolderKanban, Settings, ChevronDown, User, LogOut, Loader2, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -50,24 +50,17 @@ export default function DashboardLayout({
       icon: Settings,
       roles: ['admin', 'user'],
     },
-    {
-      name: 'Usuarios',
-      href: '/dashboard/admin/users',
-      icon: Users,
-      roles: ['admin'],
-    },
-    {
-      name: 'Observadores',
-      href: '/dashboard/admin/viewer-assignments',
-      icon: Users,
-      roles: ['admin'],
-    },
-    {
-      name: 'Debug',
-      href: '/dashboard/admin/debug',
-      icon: Bug,
-      roles: ['admin'],
-    },
+    ...(userRole === 'admin'
+      ? [
+          {
+            name: 'Administración',
+            href: '/dashboard/admin',
+            icon: Shield,
+            roles: ['admin'],
+            divider: true,
+          },
+        ]
+      : []),
   ];
 
   const filteredNavigation = userRole
@@ -149,19 +142,21 @@ export default function DashboardLayout({
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
             {filteredNavigation.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
-                  isActive(item.href)
-                    ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
-                }`}
-                title={isSidebarCollapsed ? item.name : undefined}
-              >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {!isSidebarCollapsed && <span>{item.name}</span>}
-              </Link>
+              <React.Fragment key={item.href}>
+                {item.divider && <div className="border-t border-gray-800 my-2" />}
+                <Link
+                  href={item.href}
+                  className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg transition-colors ${
+                    isActive(item.href)
+                      ? 'bg-signal-500/10 text-signal-500 border border-signal-500/20 font-medium'
+                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-900'
+                  }`}
+                  title={isSidebarCollapsed ? item.name : undefined}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {!isSidebarCollapsed && <span>{item.name}</span>}
+                </Link>
+              </React.Fragment>
             ))}
           </nav>
 
