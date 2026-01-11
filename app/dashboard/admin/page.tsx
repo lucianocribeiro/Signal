@@ -13,6 +13,7 @@ interface Stats {
 
 export default function AdminPage() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [projectCount, setProjectCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +39,24 @@ export default function AdminPage() {
     };
 
     fetchStats();
+  }, []);
+
+  useEffect(() => {
+    const fetchProjectCount = async () => {
+      try {
+        const response = await fetch('/api/admin/projects');
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        setProjectCount(data.stats?.totalProjects || 0);
+      } catch (err) {
+        console.error('[Admin Dashboard] Error fetching project count:', err);
+      }
+    };
+
+    fetchProjectCount();
   }, []);
 
   if (isLoading) {
@@ -66,11 +85,10 @@ export default function AdminPage() {
     },
     {
       name: 'Proyectos Activos',
-      value: '—',
+      value: projectCount,
       href: '/dashboard/admin/projects',
       icon: Database,
       iconClasses: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500',
-      subtitle: 'Próximamente',
     },
     {
       name: 'Tokens Consumidos',
