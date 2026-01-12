@@ -5,14 +5,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { scrapeAndSave } from '@/lib/scraper/scrape-and-save';
-import { SourceRecord } from '@/lib/scraper/types';
 import { updateProjectLastRefresh } from '@/lib/scraper/cron';
 import { analyzeContentWithGemini } from '@/lib/gemini-client';
 import { storeSignals } from '@/lib/signal-storage';
 import { logTokenUsage } from '@/lib/analysis/logUsage';
+import { getTavilyClient } from '@/lib/tavily-client';
+import { scrapeNewsApifyFallback, scrapeNewsReadabilityFallback, scrapeReddit, scrapeTwitter } from '@/lib/apify-client';
 import pLimit from 'p-limit';
 
 // Force dynamic rendering and set max duration (Puppeteer requires memory)
@@ -38,6 +39,10 @@ function resolveAnalysisSourceType(platform: string): 'news' | 'twitter' | 'redd
     return 'twitter';
   }
   return 'news';
+}
+
+function buildContentHash(content: string) {
+  return crypto.createHash('sha256').update(content).digest('hex');
 }
 
 /**
@@ -128,6 +133,13 @@ export async function POST(
     let totalSignalsDetected = 0;
     const errors: string[] = [];
     const analysisErrors: string[] = [];
+    let tavilyClient: ReturnType<typeof getTavilyClient> | null = null;
+
+    try {
+      tavilyClient = getTavilyClient();
+    } catch (error) {
+      console.error('[Project Scrape] Tavily client initialization failed:', error);
+    }
 
     const scrapePromises = sources.map((source: any, index: number) =>
       limit(async () => {
@@ -140,53 +152,154 @@ export async function POST(
           console.log(`[Project Scrape] Is Active: ${source.is_active}`);
           console.log(`[Project Scrape] Last Fetch: ${source.last_fetch_at}`);
 
-          const sourceRecord: SourceRecord = {
-            id: source.id,
-            project_id: source.project_id,
-            url: source.url,
-            name: source.name,
-            platform: source.platform,
-            is_active: source.is_active,
-            last_fetch_at: source.last_fetch_at,
-          };
+          let items: Array<{
+            content: string;
+            url: string;
+            wordCount: number;
+            method: 'tavily' | 'apify' | 'readability';
+          }> = [];
 
-          console.log(`[Project Scrape] Calling scrapeAndSave...`);
-          const result = await scrapeAndSave(sourceRecord);
-          console.log(`[Project Scrape] scrapeAndSave returned:`, JSON.stringify(result, null, 2));
-
-          if (result.success) {
-            successful++;
-            if (result.duplicate) {
-              duplicates++;
-              console.log(`[Project Scrape] ⚠️ Duplicate content for ${source.name}`);
-            } else {
-              console.log(`[Project Scrape] ✅ Successfully scraped ${source.name}`);
-            }
+          if (source.platform === 'twitter' || source.platform === 'x_twitter') {
+            const { items: twitterItems } = await scrapeTwitter(source.url);
+            items = twitterItems.map((item) => ({
+              content: item.content,
+              url: item.url,
+              wordCount: item.content.split(/\s+/).filter((word) => word.length > 0).length,
+              method: 'apify',
+            }));
+          } else if (source.platform === 'reddit') {
+            const { items: redditItems } = await scrapeReddit(source.url);
+            items = redditItems.map((item) => ({
+              content: item.content,
+              url: item.url,
+              wordCount: item.content.split(/\s+/).filter((word) => word.length > 0).length,
+              method: 'apify',
+            }));
           } else {
-            failed++;
-            errors.push(`${source.name}: ${result.error || 'Error desconocido'}`);
-            console.error(`[Project Scrape] ❌ Failed to scrape ${source.name}: ${result.error}`);
+            let finalContent = '';
+            let finalWordCount = 0;
+            let finalMethod: 'tavily' | 'apify' | 'readability' | null = null;
+
+            if (tavilyClient) {
+              try {
+                console.log(`[Project Scrape] Attempting Tavily for: ${source.url}`);
+                const [tavilyResult] = await tavilyClient.extractNewsContent([source.url]);
+
+                if (tavilyResult?.success) {
+                  finalContent = tavilyResult.content;
+                  finalWordCount = tavilyResult.wordCount;
+                  finalMethod = 'tavily';
+                  console.log(`[Project Scrape] ✅ Tavily succeeded: ${finalWordCount} words`);
+                } else {
+                  throw new Error(tavilyResult?.error || 'Tavily returned no content');
+                }
+              } catch (tavilyError) {
+                console.log(`[Project Scrape] ⚠️ Tavily failed, trying Apify...`);
+              }
+            }
+
+            if (!finalMethod) {
+              const apifyResult = await scrapeNewsApifyFallback(source.url);
+
+              if (apifyResult.success) {
+                finalContent = apifyResult.content;
+                finalWordCount = apifyResult.wordCount;
+                finalMethod = 'apify';
+                console.log(`[Project Scrape] ✅ Apify succeeded: ${finalWordCount} words`);
+              } else {
+                console.log(`[Project Scrape] ⚠️ Apify failed, trying Readability...`);
+                const readabilityResult = await scrapeNewsReadabilityFallback(source.url);
+
+                if (readabilityResult.success) {
+                  finalContent = readabilityResult.content;
+                  finalWordCount = readabilityResult.wordCount;
+                  finalMethod = 'readability';
+                  console.log(`[Project Scrape] ✅ Readability succeeded: ${finalWordCount} words`);
+                }
+              }
+            }
+
+            if (finalMethod && finalContent) {
+              items = [
+                {
+                  content: finalContent,
+                  url: source.url,
+                  wordCount: finalWordCount,
+                  method: finalMethod,
+                },
+              ];
+            }
           }
 
-          if (result.success && !result.duplicate && result.ingestionId) {
+          const hadItems = items.length > 0;
+          if (!hadItems) {
+            failed++;
+            const message = `${source.name}: All scraping methods failed`;
+            errors.push(message);
+            console.error(`[Project Scrape] ❌ ${message}`);
+          }
+
+          let sourceSuccess = false;
+          let sourceDuplicate = false;
+
+          for (const item of items) {
+            const content = item.content.trim();
+            const wordCount = item.wordCount;
+
+            if (!content) {
+              continue;
+            }
+
+            if (wordCount <= 100) {
+              console.error(
+                `[Project Scrape] ❌ Content too short for ${item.url}: ${wordCount} words`
+              );
+              continue;
+            }
+
+            const contentHash = buildContentHash(content);
+            const { data: existingIngestion } = await supabaseService
+              .from('raw_ingestions')
+              .select('id')
+              .eq('content_hash', contentHash)
+              .maybeSingle();
+
+            if (existingIngestion) {
+              duplicates++;
+              sourceDuplicate = true;
+              console.log(`[Project Scrape] ⚠️ Duplicate content detected for ${item.url}`);
+              continue;
+            }
+
+            const { data: ingestion, error: ingestionError } = await supabaseService
+              .from('raw_ingestions')
+              .insert({
+                source_id: source.id,
+                project_id: projectId,
+                content,
+                content_hash: contentHash,
+                url: item.url,
+                scraped_at: new Date().toISOString(),
+                word_count: wordCount,
+                scraper_method: item.method,
+                status: 'pending_analysis',
+              })
+              .select()
+              .single();
+
+            if (ingestionError || !ingestion) {
+              const message = ingestionError?.message || 'Error desconocido al guardar ingestion';
+              errors.push(`${source.name}: ${message}`);
+              console.error(`[Project Scrape] ❌ Failed to save ingestion:`, ingestionError);
+              continue;
+            }
+
+            sourceSuccess = true;
+            console.log(
+              `[Project Scrape] ✅ Saved ingestion: ${ingestion.id} (${item.method}, ${wordCount} words)`
+            );
+
             try {
-              const { data: ingestion, error: ingestionError } = await supabaseService
-                .from('raw_ingestions')
-                .select('id, raw_data')
-                .eq('id', result.ingestionId)
-                .single();
-
-              if (ingestionError || !ingestion) {
-                throw new Error(ingestionError?.message || 'No ingestion found for analysis');
-              }
-
-              const rawData = ingestion.raw_data as { text?: string } | null;
-              const content = rawData?.text?.trim() || '';
-
-              if (!content) {
-                throw new Error('Ingestion content is empty, skipping analysis');
-              }
-
               console.log(`[Project Scrape] 🤖 Starting AI analysis for ingestion: ${ingestion.id}`);
               const analysisStart = Date.now();
 
@@ -226,7 +339,7 @@ export async function POST(
                 await logTokenUsage(
                   projectId,
                   'ingestion_analysis',
-                  'gemini-1.5-flash',
+                  'gemini-1.5-flash-latest',
                   analysisResult.promptTokens,
                   analysisResult.completionTokens,
                   {
@@ -242,7 +355,8 @@ export async function POST(
 
               console.log(`[Project Scrape] ✅ AI analysis complete for source: ${source.url}`);
             } catch (analysisError) {
-              const message = analysisError instanceof Error ? analysisError.message : 'Unknown analysis error';
+              const message =
+                analysisError instanceof Error ? analysisError.message : 'Unknown analysis error';
               analysisErrors.push(`${source.name}: ${message}`);
               console.error(`[Project Scrape] ❌ AI analysis failed for ${source.url}:`, analysisError);
 
@@ -252,8 +366,25 @@ export async function POST(
                   status: 'analysis_failed',
                   error_message: message,
                 })
-                .eq('id', result.ingestionId);
+                .eq('id', ingestion.id);
             }
+          }
+
+          if (sourceSuccess || sourceDuplicate) {
+            successful++;
+            if (sourceDuplicate) {
+              console.log(`[Project Scrape] ⚠️ Duplicate content for ${source.name}`);
+            } else {
+              console.log(`[Project Scrape] ✅ Successfully scraped ${source.name}`);
+            }
+
+            await supabaseService
+              .from('sources')
+              .update({ last_scraped_at: new Date().toISOString() })
+              .eq('id', source.id);
+          } else if (hadItems) {
+            failed++;
+            errors.push(`${source.name}: No content stored`);
           }
 
           // Add delay between sources (rate limiting)
