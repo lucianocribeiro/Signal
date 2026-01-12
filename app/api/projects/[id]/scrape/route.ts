@@ -10,6 +10,9 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { scrapeAndSave } from '@/lib/scraper/scrape-and-save';
 import { SourceRecord } from '@/lib/scraper/types';
 import { updateProjectLastRefresh } from '@/lib/scraper/cron';
+import { analyzeContentWithGemini } from '@/lib/gemini-client';
+import { storeSignals } from '@/lib/signal-storage';
+import { logTokenUsage } from '@/lib/analysis/logUsage';
 import pLimit from 'p-limit';
 
 // Force dynamic rendering and set max duration (Puppeteer requires memory)
@@ -25,6 +28,16 @@ const CONCURRENT_SCRAPES = 5;
  */
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function resolveAnalysisSourceType(platform: string): 'news' | 'twitter' | 'reddit' {
+  if (platform === 'reddit') {
+    return 'reddit';
+  }
+  if (platform === 'twitter' || platform === 'x_twitter') {
+    return 'twitter';
+  }
+  return 'news';
 }
 
 /**
@@ -112,7 +125,9 @@ export async function POST(
     let successful = 0;
     let failed = 0;
     let duplicates = 0;
+    let totalSignalsDetected = 0;
     const errors: string[] = [];
+    const analysisErrors: string[] = [];
 
     const scrapePromises = sources.map((source: any, index: number) =>
       limit(async () => {
@@ -153,6 +168,94 @@ export async function POST(
             console.error(`[Project Scrape] ❌ Failed to scrape ${source.name}: ${result.error}`);
           }
 
+          if (result.success && !result.duplicate && result.ingestionId) {
+            try {
+              const { data: ingestion, error: ingestionError } = await supabaseService
+                .from('raw_ingestions')
+                .select('id, raw_data')
+                .eq('id', result.ingestionId)
+                .single();
+
+              if (ingestionError || !ingestion) {
+                throw new Error(ingestionError?.message || 'No ingestion found for analysis');
+              }
+
+              const rawData = ingestion.raw_data as { text?: string } | null;
+              const content = rawData?.text?.trim() || '';
+
+              if (!content) {
+                throw new Error('Ingestion content is empty, skipping analysis');
+              }
+
+              console.log(`[Project Scrape] 🤖 Starting AI analysis for ingestion: ${ingestion.id}`);
+              const analysisStart = Date.now();
+
+              const analysisResult = await analyzeContentWithGemini({
+                projectId,
+                ingestionId: ingestion.id,
+                content,
+                sourceType: resolveAnalysisSourceType(source.platform),
+                sourceUrl: source.url,
+              });
+
+              const analysisDuration = Date.now() - analysisStart;
+              totalSignalsDetected += analysisResult.signals.length;
+
+              await storeSignals({
+                projectId,
+                ingestionId: ingestion.id,
+                sourceId: source.id,
+                sourceUrl: source.url,
+                signals: analysisResult.signals,
+              });
+
+              const { error: updateError } = await supabaseService
+                .from('raw_ingestions')
+                .update({
+                  status: 'analyzed',
+                  analyzed_at: new Date().toISOString(),
+                  error_message: null,
+                })
+                .eq('id', ingestion.id);
+
+              if (updateError) {
+                console.error('[Project Scrape] ❌ Failed to update ingestion status:', updateError);
+              }
+
+              try {
+                await logTokenUsage(
+                  projectId,
+                  'ingestion_analysis',
+                  'gemini-1.5-flash',
+                  analysisResult.promptTokens,
+                  analysisResult.completionTokens,
+                  {
+                    ingestion_id: ingestion.id,
+                    signals_detected: analysisResult.signals.length,
+                    duration_ms: analysisDuration,
+                    trigger: 'manual_scrape',
+                  }
+                );
+              } catch (usageError) {
+                console.error('[Project Scrape] ⚠️ Failed to log token usage:', usageError);
+              }
+
+              console.log(`[Project Scrape] ✅ AI analysis complete for source: ${source.url}`);
+            } catch (analysisError) {
+              const message = analysisError instanceof Error ? analysisError.message : 'Unknown analysis error';
+              analysisErrors.push(`${source.name}: ${message}`);
+              console.error(`[Project Scrape] ❌ AI analysis failed for ${source.url}:`, analysisError);
+
+              await supabaseService
+                .from('raw_ingestions')
+                .update({
+                  status: 'analysis_failed',
+                  error_message: message,
+                })
+                .eq('id', result.ingestionId);
+            }
+          }
+
           // Add delay between sources (rate limiting)
           if (index < sources.length - 1) {
             console.log(`[Project Scrape] Waiting ${DELAY_BETWEEN_SOURCES_MS}ms before next source...`);
@@ -185,8 +288,10 @@ export async function POST(
     console.log(`[Project Scrape] Successful: ${successful}`);
     console.log(`[Project Scrape] Failed: ${failed}`);
     console.log(`[Project Scrape] Duplicates: ${duplicates}`);
+    console.log(`[Project Scrape] Signals detected: ${totalSignalsDetected}`);
     console.log(`[Project Scrape] Execution time: ${executionTimeMs}ms`);
     console.log(`[Project Scrape] Errors:`, errors);
+    console.log(`[Project Scrape] Analysis Errors:`, analysisErrors);
     console.log(`[Project Scrape] ===================================\n`);
 
     return NextResponse.json({
@@ -198,6 +303,8 @@ export async function POST(
       failed,
       duplicates,
       errors,
+      analysisErrors,
+      signals_detected: totalSignalsDetected,
       executionTimeMs,
       timestamp: new Date().toISOString(),
     });
