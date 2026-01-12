@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { executeScrape } from '@/app/api/scrape/route';
+import { executeScrape } from '@/lib/scraper-executor';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
