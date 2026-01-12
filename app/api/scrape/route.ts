@@ -13,8 +13,8 @@ import { storeSignals } from '@/lib/signal-storage';
 import { logTokenUsage } from '@/lib/analysis/logUsage';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300;
-export const runtime = 'nodejs';
+const maxDuration = 300;
+const runtime = 'nodejs';
 
 type SourceRecord = {
   id: string;
@@ -427,7 +427,7 @@ async function scrapeSource(
   }
 }
 
-export async function executeScrape(sourceId?: string): Promise<ScrapeSummary> {
+async function executeScrape(sourceId?: string): Promise<ScrapeSummary> {
   const supabase = await createClient();
   const sources = await getSourcesToScrape(supabase, sourceId);
 
