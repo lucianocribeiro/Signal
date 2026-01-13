@@ -27,6 +27,14 @@ type ScrapeSummary = {
 
 type AnalysisSourceType = 'news' | 'twitter' | 'reddit';
 
+type ScrapedItem = {
+  content: string;
+  url: string;
+  wordCount: number;
+  method: 'tavily' | 'apify' | 'readability';
+  metadata?: Record<string, unknown>;
+};
+
 async function getSourcesToScrape(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sourceId?: string
@@ -117,6 +125,10 @@ function buildContentHash(content: string) {
   return crypto.createHash('sha256').update(content).digest('hex');
 }
 
+function countWords(content: string) {
+  return content.split(/\s+/).filter((word) => word.length > 0).length;
+}
+
 function resolveAnalysisSourceType(sourceType: string): AnalysisSourceType {
   if (sourceType === 'reddit') {
     return 'reddit';
@@ -133,9 +145,21 @@ async function insertRawIngestion(params: {
   projectId: string;
   content: string;
   url: string;
-  metadata: Record<string, unknown>;
+  wordCount: number;
+  method: 'tavily' | 'apify' | 'readability';
+  metadata?: Record<string, unknown>;
 }) {
   const contentHash = buildContentHash(params.content);
+
+  const { data: existingIngestion } = await params.supabase
+    .from('raw_ingestions')
+    .select('id')
+    .eq('content_hash', contentHash)
+    .maybeSingle();
+
+  if (existingIngestion) {
+    return { inserted: false, duplicate: true };
+  }
 
   const { data, error } = await params.supabase
     .from('raw_ingestions')
@@ -145,7 +169,9 @@ async function insertRawIngestion(params: {
       content: params.content,
       content_hash: contentHash,
       url: params.url,
-      metadata: params.metadata,
+      word_count: params.wordCount,
+      scraper_method: params.method,
+      metadata: params.metadata ?? {},
       status: 'pending_analysis',
       scraped_at: new Date().toISOString(),
     })
@@ -188,12 +214,26 @@ async function scrapeSource(
   try {
     console.log('[Scrape] Starting source', source.id, source.url, source.source_type);
 
-    let items: { content: string; url: string; metadata: Record<string, unknown> }[] = [];
+    let items: ScrapedItem[] = [];
 
     if (source.source_type === 'twitter' || source.source_type === 'x_twitter') {
-      ({ items } = await scrapeTwitter(source.url));
+      const { items: twitterItems } = await scrapeTwitter(source.url);
+      items = twitterItems.map((item) => ({
+        content: item.content,
+        url: item.url,
+        wordCount: countWords(item.content),
+        method: 'apify',
+        metadata: item.metadata,
+      }));
     } else if (source.source_type === 'reddit') {
-      ({ items } = await scrapeReddit(source.url));
+      const { items: redditItems } = await scrapeReddit(source.url);
+      items = redditItems.map((item) => ({
+        content: item.content,
+        url: item.url,
+        wordCount: countWords(item.content),
+        method: 'apify',
+        metadata: item.metadata,
+      }));
     } else {
       let finalContent = '';
       let finalWordCount = 0;
@@ -250,9 +290,9 @@ async function scrapeSource(
         {
           content: finalContent,
           url: source.url,
+          wordCount: finalWordCount || countWords(finalContent),
+          method: finalMethod,
           metadata: {
-            method: finalMethod,
-            wordCount: finalWordCount,
             tavily_error: tavilyResult?.error ?? null,
           },
         },
@@ -267,6 +307,13 @@ async function scrapeSource(
         continue;
       }
 
+      if (item.wordCount <= 100) {
+        console.error(
+          `[Scrape] Content too short for ${item.url || source.url}: ${item.wordCount} words`
+        );
+        continue;
+      }
+
       try {
         const result = await insertRawIngestion({
           supabase,
@@ -274,7 +321,9 @@ async function scrapeSource(
           projectId: source.project_id,
           content,
           url: item.url || source.url,
-          metadata: item.metadata ?? {},
+          wordCount: item.wordCount,
+          method: item.method,
+          metadata: item.metadata,
         });
 
         if (result.duplicate) {
