@@ -309,7 +309,11 @@ async function fetchRecentIngestionsForMomentum(
       `
       id,
       source_id,
-      raw_data,
+      content,
+      url,
+      title,
+      platform,
+      word_count,
       ingested_at,
       metadata,
       sources!inner (
@@ -337,12 +341,12 @@ async function fetchRecentIngestionsForMomentum(
   const ingestions: RawIngestionForAnalysis[] = data.map((row: any) => ({
     id: row.id,
     source_id: row.source_id,
-    content: row.raw_data.text || '',
-    url: row.raw_data.url || '',
-    title: row.raw_data.title || '',
+    content: row.content || '',
+    url: row.url || '',
+    title: row.title || '',
     ingested_at: row.ingested_at,
-    platform: row.raw_data.platform || row.sources.platform || 'generic',
-    word_count: row.raw_data.wordCount || 0,
+    platform: row.platform || row.sources.platform || 'generic',
+    word_count: row.word_count || 0,
     content_hash: row.metadata?.contentHash,
     source: {
       name: row.sources.name,
