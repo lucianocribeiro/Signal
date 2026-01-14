@@ -41,15 +41,21 @@ export async function PATCH(
       .single();
 
     if (signalError || !signal) {
+      console.error('[Signals Archive] Signal lookup failed:', signalError);
       return NextResponse.json({ error: 'Señal no encontrada' }, { status: 404 });
     }
 
-    const projects = signal.projects as Array<{ owner_id: string }>;
-    if (!projects || projects.length === 0) {
+    console.log('[Signals Archive] Signal data:', { id: signal.id, project_id: signal.project_id, projects: signal.projects });
+
+    const project = signal.projects as { owner_id: string } | null;
+    if (!project || !project.owner_id) {
+      console.error('[Signals Archive] Project lookup failed - projects data:', signal.projects);
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
     }
 
-    const ownerId = projects[0].owner_id;
+    const ownerId = project.owner_id;
+    console.log('[Signals Archive] Authorization check:', { ownerId, userId: user.id, userRole: profile?.role });
+
     if (profile?.role !== 'admin' && ownerId !== user.id) {
       return NextResponse.json({ error: 'Acceso denegado' }, { status: 403 });
     }
