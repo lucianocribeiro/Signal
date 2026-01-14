@@ -8,16 +8,16 @@ interface SignalDetailModalProps {
   signal: Signal | null;
   isOpen: boolean;
   onClose: () => void;
-  onArchive: (signal: Signal) => void;
-  isArchiving?: boolean;
+  onDelete: (signal: Signal) => void;
+  isDeleting?: boolean;
 }
 
 export default function SignalDetailModal({
   signal,
   isOpen,
   onClose,
-  onArchive,
-  isArchiving = false,
+  onDelete,
+  isDeleting = false,
 }: SignalDetailModalProps) {
   if (!isOpen || !signal) return null;
 
@@ -164,11 +164,11 @@ export default function SignalDetailModal({
               Cerrar
             </button>
             <button
-              onClick={() => onArchive(signal)}
-              disabled={isArchiving}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors disabled:bg-gray-800/60 disabled:text-gray-500"
+              onClick={() => onDelete(signal)}
+              disabled={isDeleting}
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors disabled:bg-red-500/60 disabled:text-red-200"
             >
-              {isArchiving ? 'Archivando...' : 'Archivar'}
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
             </button>
           </div>
         </div>

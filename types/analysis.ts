@@ -169,7 +169,7 @@ export interface ProjectRow {
 /**
  * Signal status types (matches database ENUM)
  */
-export type SignalStatus = 'New' | 'Accelerating' | 'Stabilizing' | 'Fading' | 'Archived';
+export type SignalStatus = 'New' | 'Accelerating' | 'Stabilizing' | 'Fading';
 
 /**
  * Signal momentum types (matches database ENUM)

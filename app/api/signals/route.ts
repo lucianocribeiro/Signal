@@ -3,7 +3,7 @@
  * Epic 5: Connect Dashboard to Real Signals
  *
  * GET /api/signals?project_id=xxx&status=active
- * PATCH /api/signals - Update signal status (archiving)
+ * PATCH /api/signals - Update signal status
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -173,7 +173,7 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * PATCH - Update signal status (for archiving)
+ * PATCH - Update signal status
  * Body: { signal_id: string, status: string }
  */
 export async function PATCH(request: NextRequest) {
@@ -215,6 +215,13 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    if (status === 'Archived') {
+      return NextResponse.json(
+        { error: 'El estado "Archived" ya no es válido.' },
+        { status: 400 }
+      );
+    }
+
     console.log('[Signals API PATCH] Updating signal:', signal_id, 'to status:', status);
 
     // Verify user owns the project this signal belongs to
@@ -250,10 +257,6 @@ export async function PATCH(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
-    if (status === 'Archived') {
-      updateData.archived_at = new Date().toISOString();
-    }
-
     const { data: updatedSignal, error: updateError } = await supabase
       .from('signals')
       .update(updateData)
@@ -271,10 +274,10 @@ export async function PATCH(request: NextRequest) {
     // Log the action
     await supabase.from('audit_logs').insert({
       user_id: user.id,
-      action: 'signal_archived',
+      action: 'signal_status_updated',
       resource_type: 'signal',
       resource_id: signal_id,
-      changes: { new_status: status },
+      changes: { status },
     });
 
     console.log('[Signals API PATCH] === Request completed successfully ===');

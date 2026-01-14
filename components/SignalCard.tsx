@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, ExternalLink, TrendingUp, Minus, Clock, Archive } from 'lucide-react';
+import { AlertTriangle, ExternalLink, TrendingUp, Minus, Clock, Trash2 } from 'lucide-react';
 
 export type RiskLevel = 'watch_closely' | 'monitor';
 
@@ -11,7 +11,7 @@ export interface Signal {
   headline: string;
   summary: string;
   key_points?: string[];
-  status: 'Accelerating' | 'Stabilizing' | 'New' | 'Fading' | 'Archived';
+  status: 'Accelerating' | 'Stabilizing' | 'New' | 'Fading';
   momentum: 'high' | 'medium' | 'low';
   risk_level?: RiskLevel;
   source_name: string | null;
@@ -40,15 +40,15 @@ function formatRelativeTime(dateString: string): string {
 interface SignalCardProps {
   signal: Signal;
   onClick: () => void;
-  onArchive: (signal: Signal) => void;
-  isArchiving?: boolean;
+  onDelete: (signal: Signal) => void;
+  isDeleting?: boolean;
 }
 
 export default function SignalCard({
   signal,
   onClick,
-  onArchive,
-  isArchiving = false,
+  onDelete,
+  isDeleting = false,
 }: SignalCardProps) {
   return (
     <div
@@ -146,13 +146,13 @@ export default function SignalCard({
           <button
             onClick={(event) => {
               event.stopPropagation();
-              onArchive(signal);
+              onDelete(signal);
             }}
-            disabled={isArchiving}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors disabled:text-gray-600"
+            disabled={isDeleting}
+          className="flex items-center gap-1 text-xs text-white bg-red-500 hover:bg-red-600 rounded px-2 py-1 transition-colors disabled:bg-red-500/60 disabled:text-red-200"
           >
-            <Archive className="h-3 w-3" />
-            {isArchiving ? 'Archivando...' : 'Archivar'}
+            <Trash2 className="h-3 w-3" />
+            {isDeleting ? 'Eliminando...' : 'Eliminar'}
           </button>
         </div>
       </div>
