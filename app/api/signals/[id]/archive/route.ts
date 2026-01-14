@@ -47,7 +47,7 @@ export async function PATCH(
 
     console.log('[Signals Archive] Signal data:', { id: signal.id, project_id: signal.project_id, projects: signal.projects });
 
-    const project = signal.projects as { owner_id: string } | null;
+    const project = signal.projects?.[0] as { owner_id: string } | undefined;
     if (!project || !project.owner_id) {
       console.error('[Signals Archive] Project lookup failed - projects data:', signal.projects);
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
