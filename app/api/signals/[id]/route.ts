@@ -47,7 +47,10 @@ export async function DELETE(
 
     console.log('[Signals Delete] Signal data:', { id: signal.id, project_id: signal.project_id, projects: signal.projects });
 
-    const project = signal.projects as { owner_id: string } | undefined;
+    // Handle both array and object formats from Supabase
+    const project = (Array.isArray(signal.projects)
+      ? signal.projects[0]
+      : signal.projects) as { owner_id: string } | undefined;
     if (!project || !project.owner_id) {
       console.error('[Signals Delete] Project lookup failed - projects data:', signal.projects);
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });
