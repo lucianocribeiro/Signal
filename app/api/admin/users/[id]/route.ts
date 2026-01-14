@@ -122,19 +122,31 @@ export async function PATCH(
       );
     }
 
-    // Check if target user exists
-    const { data: existingUser, error: fetchError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    const { data: authUserData, error: authUserError } =
+      await supabaseAdmin.auth.admin.getUserById(userId);
 
-    if (fetchError || !existingUser) {
+    if (authUserError || !authUserData?.user) {
       return NextResponse.json(
         { error: 'Usuario no encontrado.' },
         { status: 404 }
       );
     }
+
+    const { data: existingUsers, error: fetchError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Error fetching user profile:', fetchError);
+      return NextResponse.json(
+        { error: 'Error al buscar el perfil de usuario.' },
+        { status: 500 }
+      );
+    }
+
+    const existingUser = existingUsers?.[0] ?? null;
 
     // Build update object with only provided fields
     const updateData: any = {};
@@ -151,31 +163,58 @@ export async function PATCH(
       updateData.phone_number = phone_number;
     }
 
-    // Update user profile
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from('user_profiles')
-      .update(updateData)
-      .eq('id', userId)
-      .select()
-      .single();
+    let updatedUser = existingUser;
+    if (!existingUser) {
+      const { data: insertedUser, error: insertError } = await supabaseAdmin
+        .from('user_profiles')
+        .insert({
+          id: userId,
+          email: authUserData.user.email,
+          role: role ?? 'user',
+          full_name:
+            full_name ??
+            (authUserData.user.user_metadata as any)?.full_name ??
+            null,
+          phone_number: phone_number ?? null,
+        })
+        .select()
+        .single();
 
-    if (updateError) {
-      console.error('Error updating user:', updateError);
-      return NextResponse.json(
-        { error: 'Error al actualizar el usuario.' },
-        { status: 500 }
-      );
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
+        return NextResponse.json(
+          { error: 'Error al crear el perfil de usuario.' },
+          { status: 500 }
+        );
+      }
+      updatedUser = insertedUser;
+    } else if (Object.keys(updateData).length > 0) {
+      const { data: updatedProfile, error: updateError } = await supabaseAdmin
+        .from('user_profiles')
+        .update(updateData)
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating user:', updateError);
+        return NextResponse.json(
+          { error: 'Error al actualizar el usuario.' },
+          { status: 500 }
+        );
+      }
+      updatedUser = updatedProfile;
     }
 
     // Determine what changed for audit log
     const changes: string[] = [];
-    if (role !== undefined && role !== existingUser.role) {
-      changes.push(`rol: ${existingUser.role} → ${role}`);
+    if (role !== undefined && role !== existingUser?.role) {
+      changes.push(`rol: ${existingUser?.role ?? 'sin perfil'} → ${role}`);
     }
-    if (full_name !== undefined && full_name !== existingUser.full_name) {
+    if (full_name !== undefined && full_name !== existingUser?.full_name) {
       changes.push('nombre actualizado');
     }
-    if (phone_number !== undefined && phone_number !== existingUser.phone_number) {
+    if (phone_number !== undefined && phone_number !== existingUser?.phone_number) {
       changes.push('teléfono actualizado');
     }
 
@@ -183,13 +222,13 @@ export async function PATCH(
     await logAuditAction(user.id, 'USER_UPDATED', userId, {
       changes,
       previous: {
-        role: existingUser.role,
+        role: existingUser?.role ?? null,
       },
       new: updateData,
     });
 
     // Get email from auth.users
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const authUser = authUserData;
 
     return NextResponse.json(
       {
@@ -245,49 +284,60 @@ export async function DELETE(
       );
     }
 
-    // Check if target user exists
-    const { data: existingUser, error: fetchError } = await supabaseAdmin
-      .from('user_profiles')
-      .select('role')
-      .eq('id', userId)
-      .single();
+    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
 
-    if (fetchError || !existingUser) {
+    if (!authUser?.user) {
       return NextResponse.json(
         { error: 'Usuario no encontrado.' },
         { status: 404 }
       );
     }
 
-    // Get email from auth.users for audit log
-    const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
-
-    // Delete from user_profiles (cascading should handle related records)
-    const { error: deleteProfileError } = await supabaseAdmin
+    const { data: existingUsers, error: fetchError } = await supabaseAdmin
       .from('user_profiles')
-      .delete()
-      .eq('id', userId);
+      .select('role')
+      .eq('id', userId)
+      .limit(1);
 
-    if (deleteProfileError) {
-      console.error('Error deleting user profile:', deleteProfileError);
+    if (fetchError) {
+      console.error('Error fetching user profile:', fetchError);
       return NextResponse.json(
-        { error: 'Error al eliminar el perfil de usuario.' },
+        { error: 'Error al buscar el perfil de usuario.' },
         { status: 500 }
       );
     }
 
-    // Delete from Supabase Auth
+    const existingUser = existingUsers?.[0] ?? null;
+
+    if (existingUser) {
+      const { error: deleteProfileError } = await supabaseAdmin
+        .from('user_profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (deleteProfileError) {
+        console.error('Error deleting user profile:', deleteProfileError);
+        return NextResponse.json(
+          { error: 'Error al eliminar el perfil de usuario.' },
+          { status: 500 }
+        );
+      }
+    }
+
     const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (deleteAuthError) {
       console.error('Error deleting auth user:', deleteAuthError);
-      // Profile already deleted, log but don't fail
+      return NextResponse.json(
+        { error: 'Error al eliminar el usuario en Auth.' },
+        { status: 500 }
+      );
     }
 
     // Log audit action
     await logAuditAction(user.id, 'USER_DELETED', userId, {
       email: authUser.user?.email,
-      role: existingUser.role,
+      role: existingUser?.role ?? null,
     });
 
     return NextResponse.json(

@@ -12,6 +12,8 @@ interface User {
   created_at: string;
   updated_at: string;
   is_banned?: boolean;
+  has_profile?: boolean;
+  has_auth?: boolean;
 }
 
 interface Stats {
@@ -120,6 +122,11 @@ export default function AdminUsersPage() {
           color: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
           label: 'VISUALIZADOR',
         };
+      case 'unassigned':
+        return {
+          color: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+          label: 'SIN PERFIL',
+        };
       default:
         return {
           color: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
@@ -189,7 +196,7 @@ export default function AdminUsersPage() {
     setActionError(null);
     setActionSuccess(null);
     setEditingUserId(user.id);
-    setEditingRole(user.role);
+    setEditingRole(user.role === 'unassigned' ? 'user' : user.role);
   };
 
   const handleCancelEdit = () => {
@@ -512,6 +519,16 @@ export default function AdminUsersPage() {
                           <div className="flex items-center gap-2">
                             <Mail className="h-4 w-4 text-gray-500" />
                             <p className="font-medium text-white">{user.email}</p>
+                            {user.has_profile === false && (
+                              <span className="text-[10px] uppercase tracking-wide text-slate-400 border border-slate-500/30 rounded-full px-2 py-0.5">
+                                Sin perfil
+                              </span>
+                            )}
+                            {user.has_auth === false && (
+                              <span className="text-[10px] uppercase tracking-wide text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">
+                                Sin auth
+                              </span>
+                            )}
                           </div>
                           {user.full_name && (
                             <p className="text-sm text-gray-500 mt-1 ml-6">{user.full_name}</p>
@@ -561,21 +578,21 @@ export default function AdminUsersPage() {
                             </div>
                             <button
                               onClick={() => handleResetPassword(user)}
-                              disabled={isResettingUserId === user.id}
+                              disabled={isResettingUserId === user.id || user.has_auth === false}
                               className="text-xs text-amber-400 hover:text-amber-300 disabled:text-gray-500"
                             >
                               Restablecer contraseña
                             </button>
                             <button
                               onClick={() => handleToggleAccess(user)}
-                              disabled={isTogglingUserId === user.id}
+                              disabled={isTogglingUserId === user.id || user.has_auth === false}
                               className="text-xs text-red-400 hover:text-red-300 disabled:text-gray-500"
                             >
                               {user.is_banned ? 'Reactivar acceso' : 'Desactivar acceso'}
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user)}
-                              disabled={isDeletingUserId === user.id}
+                              disabled={isDeletingUserId === user.id || user.has_auth === false}
                               className="text-xs text-red-500 hover:text-red-400 disabled:text-gray-500"
                             >
                               Eliminar usuario
@@ -599,21 +616,21 @@ export default function AdminUsersPage() {
                             </button>
                             <button
                               onClick={() => handleResetPassword(user)}
-                              disabled={isResettingUserId === user.id}
+                              disabled={isResettingUserId === user.id || user.has_auth === false}
                               className="text-xs text-amber-400 hover:text-amber-300 disabled:text-gray-500"
                             >
                               Restablecer contraseña
                             </button>
                             <button
                               onClick={() => handleToggleAccess(user)}
-                              disabled={isTogglingUserId === user.id}
+                              disabled={isTogglingUserId === user.id || user.has_auth === false}
                               className="text-xs text-red-400 hover:text-red-300 disabled:text-gray-500"
                             >
                               {user.is_banned ? 'Reactivar acceso' : 'Desactivar acceso'}
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user)}
-                              disabled={isDeletingUserId === user.id}
+                              disabled={isDeletingUserId === user.id || user.has_auth === false}
                               className="text-xs text-red-500 hover:text-red-400 disabled:text-gray-500"
                             >
                               Eliminar usuario

@@ -202,10 +202,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: authError }, { status: 403 });
     }
 
-    const supabase = await createServerClient();
-
-    // Get all user profiles
-    const { data: profiles, error: profilesError } = await supabase
+    // Get all user profiles (service role to bypass RLS)
+    const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('user_profiles')
       .select('id, email, full_name, role, created_at, updated_at')
       .order('created_at', { ascending: false });
@@ -218,17 +216,71 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const users = profiles || [];
-    const usersWithStatus = await Promise.all(
-      users.map(async (profile) => {
-        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(profile.id);
-        const bannedUntil = (authUser.user as any)?.banned_until;
-        return {
-          ...profile,
-          is_banned: bannedUntil ? new Date(bannedUntil) > new Date() : false,
-        };
-      })
-    );
+    const profileList = profiles || [];
+    const profilesById = new Map(profileList.map((profile) => [profile.id, profile]));
+
+    const authUsers: any[] = [];
+    let page = 1;
+    const perPage = 1000;
+
+    while (true) {
+      const { data: authData, error: authError } =
+        await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+
+      if (authError) {
+        console.error('Error listing auth users:', authError);
+        break;
+      }
+
+      const usersPage = authData?.users || [];
+      authUsers.push(...usersPage);
+
+      if (usersPage.length < perPage) {
+        break;
+      }
+      page += 1;
+    }
+
+    const combinedUsers = authUsers.map((authUser) => {
+      const profile = profilesById.get(authUser.id);
+      const bannedUntil = (authUser as any)?.banned_until;
+      return {
+        id: authUser.id,
+        email: authUser.email ?? profile?.email ?? '',
+        full_name:
+          profile?.full_name ??
+          authUser.user_metadata?.full_name ??
+          null,
+        role: profile?.role ?? 'unassigned',
+        created_at: profile?.created_at ?? authUser.created_at,
+        updated_at: profile?.updated_at ?? authUser.updated_at ?? null,
+        is_banned: bannedUntil ? new Date(bannedUntil) > new Date() : false,
+        has_profile: Boolean(profile),
+        has_auth: true,
+      };
+    });
+
+    const authUserIds = new Set(authUsers.map((authUser) => authUser.id));
+    const orphanProfiles = profileList
+      .filter((profile) => !authUserIds.has(profile.id))
+      .map((profile) => ({
+        id: profile.id,
+        email: profile.email ?? '',
+        full_name: profile.full_name ?? null,
+        role: profile.role ?? 'unassigned',
+        created_at: profile.created_at,
+        updated_at: profile.updated_at,
+        is_banned: false,
+        has_profile: true,
+        has_auth: false,
+      }));
+
+    const users = [...combinedUsers, ...orphanProfiles].sort((a, b) => {
+      const aTime = new Date(a.created_at || 0).getTime();
+      const bTime = new Date(b.created_at || 0).getTime();
+      return bTime - aTime;
+    });
+
     const stats = {
       total: users.length,
       admins: users.filter((user) => user.role === 'admin').length,
@@ -236,7 +288,7 @@ export async function GET(request: NextRequest) {
       viewers: users.filter((user) => user.role === 'viewer').length,
     };
 
-    return NextResponse.json({ users: usersWithStatus, stats }, { status: 200 });
+    return NextResponse.json({ users, stats }, { status: 200 });
 
   } catch (error) {
     console.error('Unexpected error listing users:', error);
