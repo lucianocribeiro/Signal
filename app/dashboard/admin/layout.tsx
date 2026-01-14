@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Activity, BarChart3, Bug, Database, FileText, Shield, TrendingUp, Users } from 'lucide-react';
+import { Activity, BarChart3, Bug, Database, Eye, FileText, Shield, TrendingUp, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -32,6 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navigation = [
     { name: 'Vista General', href: '/dashboard/admin', icon: BarChart3 },
     { name: 'Usuarios', href: '/dashboard/admin/users', icon: Users },
+    { name: 'Asignaciones', href: '/dashboard/admin/viewer-assignments', icon: Eye },
     { name: 'Debug', href: '/dashboard/admin/debug', icon: Bug },
     { name: 'Proyectos', href: '/dashboard/admin/projects', icon: Database },
     { name: 'Tokens & Costos', href: '/dashboard/admin/usage', icon: Activity },

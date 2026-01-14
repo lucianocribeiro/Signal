@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 interface Viewer {
@@ -22,6 +23,8 @@ interface Assignment {
 
 export default function ViewerAssignmentsPage() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
+  const viewerIdParam = searchParams.get('viewerId');
   const [viewers, setViewers] = useState<Viewer[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -69,6 +72,12 @@ export default function ViewerAssignmentsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (viewerIdParam) {
+      setSelectedViewer(viewerIdParam);
+    }
+  }, [viewerIdParam]);
 
   const handleAssign = async () => {
     if (!selectedViewer || !selectedProject) {

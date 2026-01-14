@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, password, full_name, phone_number, role } = body;
+    const { email, password, full_name, phone_number, role, project_ids } = body;
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -72,6 +72,13 @@ export async function POST(request: NextRequest) {
     if (password.length < 8) {
       return NextResponse.json(
         { error: 'La contraseña debe tener al menos 8 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    if (project_ids !== undefined && !Array.isArray(project_ids)) {
+      return NextResponse.json(
+        { error: 'Los proyectos deben ser una lista válida.' },
         { status: 400 }
       );
     }
@@ -125,7 +132,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 3: Log audit
+    // Step 3: Assign viewer projects when applicable
+    if (role === 'viewer' && Array.isArray(project_ids) && project_ids.length > 0) {
+      const assignments = project_ids.map((projectId: string) => ({
+        project_id: projectId,
+        viewer_id: authData.user!.id,
+        assigned_by: userId,
+      }));
+
+      const { error: assignmentError } = await supabaseAdmin
+        .from('project_viewer_assignments')
+        .insert(assignments);
+
+      if (assignmentError) {
+        console.error('Error assigning viewer projects:', assignmentError);
+        await supabaseAdmin.from('user_profiles').delete().eq('id', authData.user!.id);
+        await supabaseAdmin.auth.admin.deleteUser(authData.user!.id);
+        return NextResponse.json(
+          { error: 'Error al asignar proyectos al usuario.' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Step 4: Log audit
     await supabaseAdmin
       .from('audit_logs')
       .insert({
@@ -136,11 +166,12 @@ export async function POST(request: NextRequest) {
         changes: {
           email,
           role,
-          created_by: userId
+          created_by: userId,
+          project_ids: Array.isArray(project_ids) ? project_ids : []
         }
       });
 
-    // Step 4: Return created user data
+    // Step 5: Return created user data
     return NextResponse.json({
       success: true,
       user: {
@@ -188,6 +219,16 @@ export async function GET(request: NextRequest) {
     }
 
     const users = profiles || [];
+    const usersWithStatus = await Promise.all(
+      users.map(async (profile) => {
+        const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(profile.id);
+        const bannedUntil = (authUser.user as any)?.banned_until;
+        return {
+          ...profile,
+          is_banned: bannedUntil ? new Date(bannedUntil) > new Date() : false,
+        };
+      })
+    );
     const stats = {
       total: users.length,
       admins: users.filter((user) => user.role === 'admin').length,
@@ -195,7 +236,7 @@ export async function GET(request: NextRequest) {
       viewers: users.filter((user) => user.role === 'viewer').length,
     };
 
-    return NextResponse.json({ users, stats }, { status: 200 });
+    return NextResponse.json({ users: usersWithStatus, stats }, { status: 200 });
 
   } catch (error) {
     console.error('Unexpected error listing users:', error);
