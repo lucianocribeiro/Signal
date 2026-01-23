@@ -8,6 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { runFullAnalysis } from '@/lib/analysis/runFullAnalysis';
+import type { FullAnalysisResult } from '@/types/analysis';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -69,40 +71,30 @@ export async function GET(request: NextRequest) {
 
     const results = [];
 
-    // Process each project
+    // Process each project directly
     for (const project of projects) {
       try {
         console.log(`[CRON Analyze] Processing project: ${project.name} (${project.id})`);
 
-        // Call the analysis API internally
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
-          (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-
-        const response = await fetch(`${baseUrl}/api/analysis/run`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${cronSecret}`,
-          },
-          body: JSON.stringify({ projectId: project.id }),
-        });
-
-        const data = await response.json();
+        // Call analysis function directly (no HTTP fetch)
+        const result: FullAnalysisResult = await runFullAnalysis(project.id);
 
         results.push({
           projectId: project.id,
           projectName: project.name,
-          success: response.ok,
-          newSignals: data.new_signals?.count || 0,
-          updatedSignals: data.momentum_updates?.count || 0,
-          data: response.ok ? data : null,
-          error: response.ok ? null : data.error,
+          success: result.success,
+          newSignals: result.new_signals?.count || 0,
+          updatedSignals: result.momentum_updates?.count || 0,
+          data: result,
+          error: result.success ? null : result.error,
         });
 
-        if (response.ok) {
-          console.log(`[CRON Analyze] ✓ Project ${project.name}: ${data.new_signals?.count || 0} new signals, ${data.momentum_updates?.count || 0} updated`);
+        if (result.success) {
+          console.log(
+            `[CRON Analyze] ✓ Project ${project.name}: ${result.new_signals?.count || 0} new signals, ${result.momentum_updates?.count || 0} updated`
+          );
         } else {
-          console.error(`[CRON Analyze] ✗ Project ${project.name} failed:`, data.error);
+          console.error(`[CRON Analyze] ✗ Project ${project.name} failed:`, result.error);
         }
 
       } catch (error) {
