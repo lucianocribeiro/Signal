@@ -1,6 +1,6 @@
 /**
  * Google Gemini AI Client
- * Configured for Gemini 1.5 Flash model for signal detection
+ * Configured for Gemini 2.0 Flash (stable) model for signal detection
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -46,7 +46,7 @@ function initializeGemini() {
 }
 
 /**
- * Get Gemini 1.5 Flash model instance
+ * Get Gemini 2.0 Flash model instance (stable)
  * Configured for signal detection with JSON output
  *
  * @returns Configured GenerativeModel instance
@@ -58,9 +58,9 @@ function initializeGemini() {
 export function getGeminiModel() {
   const genAI = initializeGemini();
 
-  // Use Gemini 2.0 Flash Experimental (most widely available)
+  // Use Gemini 2.0 Flash (stable release, widely available)
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash-exp',
+    model: 'gemini-2.0-flash',
     generationConfig: {
       temperature: 0.3, // Lower temperature for consistent, focused outputs
       topP: 0.95,
@@ -74,7 +74,7 @@ export function getGeminiModel() {
 }
 
 /**
- * Gemini 1.5 Flash pricing (as of 2024)
+ * Gemini 2.0 Flash pricing
  * Used for cost estimation in usage logs
  */
 export const GEMINI_PRICING = {
