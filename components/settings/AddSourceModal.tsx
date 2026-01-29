@@ -8,7 +8,7 @@ interface SourceRecord {
   project_id: string;
   url: string;
   name: string | null;
-  source_type: 'x_twitter' | 'twitter' | 'reddit' | 'news' | 'other';
+  source_type: 'twitter' | 'reddit' | 'news' | 'marketplace';
   is_active: boolean;
   last_scraped_at: string | null;
   created_at: string;
@@ -22,12 +22,13 @@ interface AddSourceModalProps {
   onSourceAdded: (source: SourceRecord) => void;
 }
 
-type SourceTypeOption = 'x_twitter' | 'reddit' | 'news';
+type SourceTypeOption = 'twitter' | 'reddit' | 'news' | 'marketplace';
 
 const SOURCE_TYPE_OPTIONS: { value: SourceTypeOption; label: string }[] = [
-  { value: 'x_twitter', label: 'Twitter/X' },
+  { value: 'twitter', label: 'Twitter' },
   { value: 'reddit', label: 'Reddit' },
   { value: 'news', label: 'Noticias' },
+  { value: 'marketplace', label: 'Marketplace/Búsquedas' },
 ];
 
 function isValidUrl(value: string) {
@@ -55,11 +56,14 @@ export default function AddSourceModal({
     if (!isValidUrl(url)) return 'URL inválida';
     const lowerUrl = url.toLowerCase();
 
-    if (sourceType === 'x_twitter' && !(lowerUrl.includes('x.com') || lowerUrl.includes('twitter.com'))) {
-      return 'La URL debe ser de Twitter/X';
+    if (sourceType === 'twitter' && !(lowerUrl.includes('x.com') || lowerUrl.includes('twitter.com'))) {
+      return 'La URL debe ser de Twitter';
     }
     if (sourceType === 'reddit' && !lowerUrl.includes('reddit.com')) {
       return 'La URL debe ser de Reddit';
+    }
+    if (sourceType === 'marketplace' && !(lowerUrl.includes('mercadolibre.com') || lowerUrl.includes('zonaprop.com') || lowerUrl.includes('properati.com') || lowerUrl.includes('olx.com'))) {
+      return 'La URL debe ser de un marketplace (MercadoLibre, ZonaProp, etc.)';
     }
     return null;
   }, [url, sourceType]);

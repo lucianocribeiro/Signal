@@ -13,7 +13,7 @@ interface Source {
   project_id: string;
   url: string;
   name: string | null;
-  source_type: 'x_twitter' | 'twitter' | 'reddit' | 'news' | 'other';
+  source_type: 'twitter' | 'reddit' | 'news' | 'marketplace';
   platform: string;
   is_active: boolean;
   last_scraped_at: string | null;
@@ -337,9 +337,9 @@ export default function SourcesPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">
-                  {sources.filter((s) => s.source_type === 'twitter' || s.source_type === 'x_twitter').length}
+                  {sources.filter((s) => s.source_type === 'twitter').length}
                 </p>
-                <p className="text-sm text-gray-500">Twitter/X</p>
+                <p className="text-sm text-gray-500">Twitter</p>
               </div>
             </div>
           </div>

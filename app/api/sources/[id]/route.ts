@@ -267,7 +267,7 @@ export async function PATCH(
     }
 
     if (source_type !== undefined) {
-      const allowedTypes = ['x_twitter', 'reddit', 'news', 'other'];
+      const allowedTypes = ['twitter', 'reddit', 'news', 'marketplace'];
       if (!allowedTypes.includes(source_type)) {
         return NextResponse.json(
           { error: 'Tipo de fuente inválido' },

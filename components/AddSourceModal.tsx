@@ -13,9 +13,9 @@ interface AddSourceModalProps {
 // Platform options
 const platformOptions = [
   { value: 'news', label: 'Noticias (RSS/Artículos)' },
-  { value: 'x_twitter', label: 'X (Twitter)' },
+  { value: 'twitter', label: 'Twitter' },
   { value: 'reddit', label: 'Reddit' },
-  { value: 'other', label: 'Otro' }
+  { value: 'marketplace', label: 'Marketplace/Búsquedas' }
 ];
 
 // Auto-detect platform from URL
@@ -24,9 +24,9 @@ function detectPlatformFromUrl(url: string): string {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname.toLowerCase();
 
-    // X/Twitter detection
+    // Twitter detection
     if (hostname.includes('x.com') || hostname.includes('twitter.com')) {
-      return 'x_twitter';
+      return 'twitter';
     }
 
     // Reddit detection
@@ -34,20 +34,26 @@ function detectPlatformFromUrl(url: string): string {
       return 'reddit';
     }
 
+    // Marketplace detection
+    const marketplaceDomains = ['mercadolibre.com', 'zonaprop.com', 'properati.com', 'olx.com'];
+    if (marketplaceDomains.some(domain => hostname.includes(domain))) {
+      return 'marketplace';
+    }
+
     // RSS/News detection (common patterns)
     if (url.includes('/rss') || url.includes('/feed') || url.includes('.xml')) {
       return 'news';
     }
 
-    // Default to news for news domains
+    // Default to news for known news domains
     const newsDomains = ['lanacion.com.ar', 'clarin.com', 'infobae.com', 'pagina12.com.ar'];
     if (newsDomains.some(domain => hostname.includes(domain))) {
       return 'news';
     }
 
-    return 'other';
+    return 'news'; // Default to news instead of 'other'
   } catch {
-    return 'other';
+    return 'news';
   }
 }
 
@@ -214,16 +220,22 @@ export default function AddSourceModal({ isOpen, onClose, projectId, onSourceAdd
                 </option>
               ))}
             </select>
-            {platform === 'x_twitter' && !manuallySelectedPlatform && (
+            {platform === 'twitter' && !manuallySelectedPlatform && (
               <p className="text-sm text-green-400 mt-1.5 flex items-center gap-1">
                 <CheckCircle2 className="h-4 w-4" />
-                Detectado como fuente de X (Twitter)
+                Detectado como fuente de Twitter
               </p>
             )}
             {platform === 'reddit' && !manuallySelectedPlatform && (
               <p className="text-sm text-green-400 mt-1.5 flex items-center gap-1">
                 <CheckCircle2 className="h-4 w-4" />
                 Detectado como fuente de Reddit
+              </p>
+            )}
+            {platform === 'marketplace' && !manuallySelectedPlatform && (
+              <p className="text-sm text-green-400 mt-1.5 flex items-center gap-1">
+                <CheckCircle2 className="h-4 w-4" />
+                Detectado como Marketplace
               </p>
             )}
             {platform === 'news' && !manuallySelectedPlatform && url && (

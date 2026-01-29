@@ -36,6 +36,8 @@ export interface ScraperResult {
     scrolled?: boolean;
     /** Method used for content extraction */
     extractionMethod?: string;
+    /** Number of listings found (for marketplace) */
+    listingsFound?: number;
   };
 }
 
@@ -83,13 +85,15 @@ export interface ScrapedContent {
       link: string;
       pubDate: string;
     }>;
+    listingCount?: number;
+    platform?: string;
   };
 }
 
 /**
  * Supported platforms for platform-specific scraping
  */
-export type Platform = 'twitter' | 'reddit' | 'news' | 'generic' | 'rss';
+export type Platform = 'twitter' | 'reddit' | 'news' | 'generic' | 'rss' | 'marketplace';
 
 /**
  * Platform-specific configuration for dynamic content handling

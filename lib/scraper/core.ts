@@ -11,6 +11,7 @@ import {
 } from './dynamic-handler';
 import { scrapeRedditJson, scrapeWithReadability } from './fast-path';
 import { parseRSSFeedXml, isRSSFeed } from './rss-parser';
+import { extractMarketplaceListings } from './keyword-filter';
 
 /**
  * Default scraper options
@@ -346,6 +347,82 @@ Content: ${article.description || article.content}
     });
 
     const platformConfig = getPlatformConfig(platform);
+
+    // ===== MARKETPLACE HANDLING =====
+    if (platform === 'marketplace') {
+      console.log('[Scraper] Processing marketplace page with listing extraction');
+
+      try {
+        // Wait for listings to load
+        await waitForDynamicContent(page, platformConfig);
+        await scrollPage(page, platformConfig);
+
+        // Extract individual listings
+        const listings = await extractMarketplaceListings(page, platform);
+        console.log(`[Scraper] Extracted ${listings.length} marketplace listings`);
+
+        if (listings.length === 0) {
+          console.warn('[Scraper] No listings found on marketplace page');
+          return {
+            success: false,
+            url,
+            timestamp: new Date(),
+            error: 'No listings found',
+            metadata: {
+              domain: extractDomain(url),
+              duration: Date.now() - startTime,
+              platform,
+            },
+          };
+        }
+
+        // Format listings into text
+        const combinedText = listings
+          .map((listing, index) => {
+            const parts = [
+              `Listing ${index + 1}:`,
+              `Title: ${listing.title}`,
+            ];
+            if (listing.description) parts.push(`Description: ${listing.description}`);
+            if (listing.price) parts.push(`Price: ${listing.price}`);
+            if (listing.link) parts.push(`Link: ${listing.link}`);
+            return parts.join('\n');
+          })
+          .join('\n\n---\n\n');
+
+        const wordCount = combinedText.split(/\s+/).filter(w => w.length > 0).length;
+
+        console.log(`[Scraper] Marketplace scraping succeeded in ${Date.now() - startTime}ms`);
+        console.log(`[Scraper] Extracted ${listings.length} listings (${wordCount} words)`);
+
+        return {
+          success: true,
+          content: {
+            text: combinedText,
+            title: `Marketplace Listings (${listings.length} items)`,
+            url,
+            scrapedAt: new Date(),
+            wordCount,
+            metadata: {
+              listingCount: listings.length,
+              platform: 'marketplace',
+            },
+          },
+          url,
+          timestamp: new Date(),
+          metadata: {
+            domain: extractDomain(url),
+            duration: Date.now() - startTime,
+            platform: 'marketplace',
+            extractionMethod: 'marketplace-listings',
+            listingsFound: listings.length,
+          },
+        };
+      } catch (marketplaceError) {
+        console.error('[Scraper] Marketplace extraction failed:', marketplaceError);
+        // Fall through to regular extraction
+      }
+    }
 
     // Wait for dynamic content to load
     const selectorsFound = await waitForDynamicContent(page, platformConfig);

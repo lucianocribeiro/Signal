@@ -4,6 +4,7 @@
  */
 
 import { createServiceClient } from '../supabase/service';
+import { extractKeywords, containsKeywords } from '../scraper/keyword-filter';
 import type {
   RawIngestionForAnalysis,
   ProjectAnalysisContext,
@@ -228,4 +229,70 @@ export function calculateIngestionStats(
     hours_included: hoursBack,
     platforms,
   };
+}
+
+/**
+ * Filter marketplace ingestions by project keywords
+ * Extracts keywords from signal_instructions and filters listing content
+ *
+ * @param ingestions - Array of raw ingestions to filter
+ * @param projectId - The project ID to get signal_instructions from
+ * @returns Filtered array of ingestions
+ *
+ * @example
+ * const filtered = await filterMarketplaceIngestions(ingestions, 'project-uuid');
+ */
+export async function filterMarketplaceIngestions(
+  ingestions: RawIngestionForAnalysis[],
+  projectId: string
+): Promise<RawIngestionForAnalysis[]> {
+  const supabase = createServiceClient();
+
+  // Get project's signal_instructions
+  const { data: project } = await supabase
+    .from('projects')
+    .select('signal_instructions')
+    .eq('id', projectId)
+    .single();
+
+  if (!project || !project.signal_instructions) {
+    console.log('[Filter] No signal_instructions found, returning all ingestions');
+    return ingestions;
+  }
+
+  // Extract keywords
+  const keywords = extractKeywords(project.signal_instructions);
+
+  if (keywords.length === 0) {
+    console.log('[Filter] No keywords extracted, returning all ingestions');
+    return ingestions;
+  }
+
+  console.log(`[Filter] Extracted ${keywords.length} keywords:`, keywords.slice(0, 10));
+
+  // Filter marketplace ingestions only
+  const filtered = ingestions.filter(ingestion => {
+    const isMarketplace = ingestion.platform === 'marketplace';
+
+    if (!isMarketplace) {
+      return true; // Keep all non-marketplace ingestions
+    }
+
+    // For marketplace, check if content matches keywords
+    const text = ingestion.content || '';
+    const matches = containsKeywords(text, keywords);
+
+    if (!matches) {
+      console.log(`[Filter] Filtered out marketplace ingestion (no keyword match): ${ingestion.id}`);
+    }
+
+    return matches;
+  });
+
+  const filteredCount = ingestions.length - filtered.length;
+  if (filteredCount > 0) {
+    console.log(`[Filter] Filtered out ${filteredCount} marketplace ingestions (${filtered.length} remaining)`);
+  }
+
+  return filtered;
 }

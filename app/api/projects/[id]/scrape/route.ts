@@ -35,7 +35,7 @@ function resolveAnalysisSourceType(platform: string): 'news' | 'twitter' | 'redd
   if (platform === 'reddit') {
     return 'reddit';
   }
-  if (platform === 'twitter' || platform === 'x_twitter') {
+  if (platform === 'twitter') {
     return 'twitter';
   }
   return 'news';
@@ -159,7 +159,7 @@ export async function POST(
             method: 'tavily' | 'apify' | 'readability';
           }> = [];
 
-          if (source.platform === 'twitter' || source.platform === 'x_twitter') {
+          if (source.platform === 'twitter') {
             const { items: twitterItems } = await scrapeTwitter(source.url);
             items = twitterItems.map((item) => ({
               content: item.content,

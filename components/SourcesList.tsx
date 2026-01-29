@@ -8,7 +8,7 @@ interface Source {
   project_id: string;
   url: string;
   name: string | null;
-  source_type: 'x_twitter' | 'twitter' | 'reddit' | 'news' | 'other';
+  source_type: 'twitter' | 'reddit' | 'news' | 'marketplace';
   platform: string;
   is_active: boolean;
   last_scraped_at: string | null;
@@ -23,13 +23,6 @@ interface SourcesListProps {
   onUpdateSource?: (sourceId: string, updates: { url: string; name: string | null; source_type: Source['source_type'] }) => Promise<Source | void>;
   onReactivateSource?: (sourceId: string) => Promise<Source | void>;
 }
-
-const normalizeSourceType = (sourceType: Source['source_type']) => {
-  if (sourceType === 'twitter') {
-    return 'x_twitter';
-  }
-  return sourceType;
-};
 
 const isValidUrl = (urlString: string): boolean => {
   try {
@@ -53,7 +46,7 @@ export default function SourcesList({ sources, isLoading, onDeleteClick, onUpdat
     setEditingId(source.id);
     setDraftUrl(source.url || '');
     setDraftName(source.name || '');
-    setDraftType(normalizeSourceType(source.source_type));
+    setDraftType(source.source_type);
     setEditError(null);
     setActionError(null);
   };
@@ -84,11 +77,10 @@ export default function SourcesList({ sources, isLoading, onDeleteClick, onUpdat
     }
 
     const nextName = trimmedName.length > 0 ? trimmedName : null;
-    const normalizedExistingType = normalizeSourceType(source.source_type);
     const hasChanges =
       trimmedUrl !== source.url ||
       nextName !== (source.name || null) ||
-      draftType !== normalizedExistingType;
+      draftType !== source.source_type;
 
     if (!hasChanges) {
       setEditError('No hay cambios para guardar');
@@ -130,13 +122,13 @@ export default function SourcesList({ sources, isLoading, onDeleteClick, onUpdat
   const getSourceIcon = (sourceType: string) => {
     switch (sourceType) {
       case 'twitter':
-      case 'x_twitter':
         return <Twitter className="h-5 w-5 text-sky-400" />;
       case 'reddit':
         return <Megaphone className="h-5 w-5 text-orange-400" />;
+      case 'marketplace':
+        return <Globe className="h-5 w-5 text-purple-400" />;
       case 'news':
-        return <Globe className="h-5 w-5 text-gray-400" />;
-      case 'other':
+      case 'rss':
         return <Globe className="h-5 w-5 text-gray-400" />;
       default:
         return <Globe className="h-5 w-5 text-gray-400" />;
@@ -147,13 +139,13 @@ export default function SourcesList({ sources, isLoading, onDeleteClick, onUpdat
   const getSourceBadgeColor = (sourceType: string) => {
     switch (sourceType) {
       case 'twitter':
-      case 'x_twitter':
         return 'bg-sky-500/10 text-sky-400 border-sky-500/30';
       case 'reddit':
         return 'bg-orange-500/10 text-orange-400 border-orange-500/30';
+      case 'marketplace':
+        return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
       case 'news':
-        return 'bg-gray-500/10 text-gray-400 border-gray-500/30';
-      case 'other':
+      case 'rss':
         return 'bg-gray-500/10 text-gray-400 border-gray-500/30';
       default:
         return 'bg-gray-500/10 text-gray-400 border-gray-500/30';
@@ -291,9 +283,9 @@ export default function SourcesList({ sources, isLoading, onDeleteClick, onUpdat
                           disabled={isSaving}
                         >
                           <option value="news">Noticias (RSS/Artículos)</option>
-                          <option value="x_twitter">X (Twitter)</option>
+                          <option value="twitter">Twitter</option>
                           <option value="reddit">Reddit</option>
-                          <option value="other">Otro</option>
+                          <option value="marketplace">Marketplace/Búsquedas</option>
                         </select>
                       </div>
                     </div>
@@ -420,10 +412,10 @@ export default function SourcesList({ sources, isLoading, onDeleteClick, onUpdat
                   <span className="capitalize">
                     {source.source_type === 'news'
                       ? 'Noticias'
-                      : source.source_type === 'x_twitter' || source.source_type === 'twitter'
-                        ? 'X/Twitter'
-                        : source.source_type === 'other'
-                          ? 'Otro'
+                      : source.source_type === 'twitter'
+                        ? 'Twitter'
+                        : source.source_type === 'marketplace'
+                          ? 'Marketplace'
                           : source.source_type}
                   </span>
                 </div>

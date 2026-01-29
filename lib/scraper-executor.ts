@@ -133,7 +133,7 @@ function resolveAnalysisSourceType(sourceType: string): AnalysisSourceType {
   if (sourceType === 'reddit') {
     return 'reddit';
   }
-  if (sourceType === 'twitter' || sourceType === 'x_twitter') {
+  if (sourceType === 'twitter') {
     return 'twitter';
   }
   return 'news';
@@ -216,7 +216,7 @@ async function scrapeSource(
 
     let items: ScrapedItem[] = [];
 
-    if (source.source_type === 'twitter' || source.source_type === 'x_twitter') {
+    if (source.source_type === 'twitter') {
       const { items: twitterItems } = await scrapeTwitter(source.url);
       items = twitterItems.map((item) => ({
         content: item.content,
@@ -469,13 +469,12 @@ export async function executeScrape(sourceId?: string): Promise<ScrapeSummary> {
   let duplicates = 0;
 
   const twitterSources = sources.filter(
-    (source) => source.source_type === 'twitter' || source.source_type === 'x_twitter'
+    (source) => source.source_type === 'twitter'
   );
   const redditSources = sources.filter((source) => source.source_type === 'reddit');
   const newsSources = sources.filter(
     (source) =>
       source.source_type !== 'twitter' &&
-      source.source_type !== 'x_twitter' &&
       source.source_type !== 'reddit'
   );
 

@@ -26,7 +26,7 @@ export interface RawIngestionForAnalysis {
   /** Timestamp when content was ingested */
   ingested_at: string;
 
-  /** Platform type (e.g., 'x_twitter', 'reddit', 'news') */
+  /** Platform type (e.g., 'twitter', 'reddit', 'news', 'marketplace') */
   platform: string;
 
   /** Word count of the content */

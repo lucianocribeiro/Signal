@@ -121,6 +121,38 @@ const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
     scrollDelay: 0,
     waitTimeout: 5000,
   },
+
+  marketplace: {
+    name: 'marketplace',
+    selectors: [
+      // MercadoLibre
+      '.ui-search-result',
+      '.poly-card',
+      '.ui-search-layout__item',
+      // ZonaProp
+      '.PropertyCard',
+      '[data-qa="posting PROPERTY"]',
+      // Generic marketplace
+      '.listing-item',
+      '.product-card',
+      '.search-result',
+    ],
+    contentSelectors: [
+      // MercadoLibre
+      '.poly-card__content',
+      '.ui-search-item__group',
+      '.ui-search-result__content',
+      // ZonaProp
+      '.PropertyCard-content',
+      '.posting-description',
+      // Generic
+      '.listing-content',
+      '.product-info',
+    ],
+    scrollCount: 2, // Scroll to load more listings
+    scrollDelay: 1500,
+    waitTimeout: 10000,
+  },
 };
 
 /**
@@ -146,7 +178,7 @@ export function detectPlatform(url: string): Platform {
 
     // Feed detection (RSS/Atom/XML)
     if (pathname.endsWith('.xml') || pathname.endsWith('.rss') || url.toLowerCase().includes('/feed/')) {
-      return 'news';
+      return 'rss';
     }
 
     // Twitter/X detection
@@ -157,6 +189,22 @@ export function detectPlatform(url: string): Platform {
     // Reddit detection
     if (domain === 'reddit.com' || domain.endsWith('.reddit.com')) {
       return 'reddit';
+    }
+
+    // Marketplace detection
+    const marketplaceDomains = [
+      'mercadolibre.com',
+      'mercadolibre.com.ar',
+      'mercadolibre.com.mx',
+      'zonaprop.com.ar',
+      'properati.com.ar',
+      'olx.com.ar',
+    ];
+
+    if (marketplaceDomains.some(marketplaceDomain =>
+      domain === marketplaceDomain || domain.endsWith(`.${marketplaceDomain}`)
+    )) {
+      return 'marketplace';
     }
 
     // News site detection (common news domains)
@@ -173,6 +221,10 @@ export function detectPlatform(url: string): Platform {
       'forbes.com',
       'wsj.com',
       'ft.com',
+      'lanacion.com.ar',
+      'clarin.com',
+      'infobae.com',
+      'pagina12.com.ar',
     ];
 
     if (newsDomains.some(newsDomain => domain === newsDomain || domain.endsWith(`.${newsDomain}`))) {

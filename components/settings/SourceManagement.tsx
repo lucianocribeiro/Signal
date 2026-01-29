@@ -11,7 +11,7 @@ interface SourceRecord {
   project_id: string;
   url: string;
   name: string | null;
-  source_type: 'x_twitter' | 'twitter' | 'reddit' | 'news' | 'other';
+  source_type: 'twitter' | 'reddit' | 'news' | 'marketplace';
   is_active: boolean;
   last_scraped_at: string | null;
   created_at: string;
@@ -41,21 +41,22 @@ function formatRelativeTime(value: string | null) {
 
 function getTypeBadge(sourceType: SourceRecord['source_type']) {
   switch (sourceType) {
-    case 'x_twitter':
     case 'twitter':
       return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
     case 'reddit':
       return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+    case 'marketplace':
+      return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
     case 'news':
-      return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
     default:
       return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
   }
 }
 
 function getTypeLabel(sourceType: SourceRecord['source_type']) {
-  if (sourceType === 'x_twitter' || sourceType === 'twitter') return 'Twitter/X';
+  if (sourceType === 'twitter') return 'Twitter';
   if (sourceType === 'reddit') return 'Reddit';
+  if (sourceType === 'marketplace') return 'Marketplace';
   if (sourceType === 'news') return 'Noticias';
   return 'Otra';
 }

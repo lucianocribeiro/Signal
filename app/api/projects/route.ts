@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
 
 // Helper function to detect source type from URL (matches database enum)
-function detectSourceType(url: string): 'twitter' | 'reddit' | 'news' {
+function detectSourceType(url: string): 'twitter' | 'reddit' | 'news' | 'marketplace' {
   const urlLower = url.toLowerCase();
 
   if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) {
@@ -13,6 +13,10 @@ function detectSourceType(url: string): 'twitter' | 'reddit' | 'news' {
   }
   if (urlLower.includes('reddit.com')) {
     return 'reddit';
+  }
+  if (urlLower.includes('mercadolibre.com') || urlLower.includes('zonaprop.com') ||
+      urlLower.includes('properati.com') || urlLower.includes('olx.com')) {
+    return 'marketplace';
   }
   return 'news';
 }
